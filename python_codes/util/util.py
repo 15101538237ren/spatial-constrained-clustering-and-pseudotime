@@ -6,6 +6,7 @@ import numpy as np
 import scanpy as sc
 import pandas as pd
 import networkx as nx
+import torch.nn.functional as F
 from scipy.spatial import distance
 from sklearn.neighbors import kneighbors_graph
 
@@ -63,7 +64,7 @@ def preprocessing_data(args, adata):
     cut = estimate_cutoff_knn(coords, k=args.n_neighbors_for_knn_graph)
     spatial_graph = graph_alpha(coords, cut=cut, n_layer=args.alpha_n_layer)
     spatial_dists = distance.cdist(coords, coords, 'euclidean')
-    spatial_dists = torch.tensor((spatial_dists / np.max(spatial_dists))).float()
+    spatial_dists = F.normalize(torch.tensor(spatial_dists).float())
     return expr, genes, cells, spatial_graph, spatial_dists
 
 def estimate_cutoff_knn(pts, k=10):
@@ -110,10 +111,14 @@ def graph_alpha(pts, n_layer=1, cut=np.inf):
 
     return nx.to_scipy_sparse_matrix(extended_graph, format='csr')
 
+def get_target_fp(args, dataset, sample_name):
+    sp_suffix = "_SP" if args.spatial else ""
+    method_dir = f"{args.arch}{sp_suffix}"
+    return f"{dataset}/{sample_name}/{method_dir}"
+
 def save_features(args, reduced_reprs, dataset, sample_name):
-    feature_dir = f'{args.feature_dir}/{dataset}'
-    mkdir(feature_dir)
-    sp_suffix = "_sp" if args.spatial else ""
-    feature_fp = os.path.join(feature_dir, f"{sample_name}{sp_suffix}.tsv")
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    mkdir(output_dir)
+    feature_fp = os.path.join(output_dir, f"features.tsv")
     np.savetxt(feature_fp, reduced_reprs[:, :], delimiter="\t")
     print(f"features saved successful at {feature_fp}")

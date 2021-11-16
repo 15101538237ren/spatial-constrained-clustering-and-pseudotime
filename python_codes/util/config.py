@@ -19,9 +19,7 @@ parser.add_argument('--epochs', type=int, default=1000)
 parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--penalty_scaler', type=float, default=1.0)
 parser.add_argument('--dataset_dir', type=str, default='../data')
-parser.add_argument('--feature_dir', type=str, default='../output/features')
-parser.add_argument('--cluster_dir', type=str, default='../output/clusters')
-parser.add_argument('--figure_dir', type=str, default='../output/figures')
+parser.add_argument('--output_dir', type=str, default='../output')
 
 args = parser.parse_args()
 args.device = 'cuda:%d' % args.gpu if torch.cuda.is_available() else 'cpu'

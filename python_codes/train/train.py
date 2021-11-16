@@ -3,6 +3,7 @@ import random
 import torch
 import numpy as np
 import torch.nn.functional as F
+from python_codes.models.model_hub import get_model
 
 def sparse_mx_to_torch_edge_list(sparse_mx):
     sparse_mx = sparse_mx.tocoo().astype(np.float32)
@@ -10,11 +11,12 @@ def sparse_mx_to_torch_edge_list(sparse_mx):
         np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64))
     return edge_list
 
-def train(args, model, expr, sp_graph, sp_dists, random_seed = 42):
+def train(args, expr, sp_graph, sp_dists, random_seed = 42):
     torch.manual_seed(random_seed)
     random.seed(random_seed)
     np.random.seed(random_seed)
 
+    model = get_model(args, expr.shape[1])
     tail = '+ SP' if args.spatial else ''
     print(f'Training {args.arch} {tail}')
 
@@ -27,7 +29,7 @@ def train(args, model, expr, sp_graph, sp_dists, random_seed = 42):
     min_loss = np.inf
     patience = 0
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-
+    best_params = model.state_dict()
     for epoch in range(args.epochs):
         train_loss = 0.0
         torch.set_grad_enabled(True)
@@ -50,10 +52,14 @@ def train(args, model, expr, sp_graph, sp_dists, random_seed = 42):
         else:
             patience = 0
             min_loss = train_loss
+            best_params = model.state_dict()
         if epoch % 10 == 1:
             print("Epoch %d/%d" % (epoch + 1, args.epochs))
             print("Loss:" + str(train_loss))
         if patience > args.patience and epoch > args.min_stop:
             break
+    model = get_model(args, expr.shape[1]).to(args.device)
+    model.load_state_dict(best_params)
+
     z, _, _ = model(expr, edge_list)
     return z.cpu().detach().numpy()
