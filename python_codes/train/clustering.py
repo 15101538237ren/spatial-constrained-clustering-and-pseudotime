@@ -49,12 +49,15 @@ def clustering(args, dataset, sample_name, method = "leiden", n_neighbors=50):
 
         if dataset == "DLPFC":
             n_clusters = 5 if sample_name in ['151669', '151670', '151671', '151672'] else 6
-            resolution = res_search_fixed_clus(adata_feat, n_clusters)
-        else:
-            resolution = 0.6
-
-        labels = leiden(adata_feat, resolution=resolution)
-        np.savetxt(cluster_fp, labels, fmt='%d', header='', footer='', comments='')
-        print("Saved %s succesful!" % cluster_fp)
+            if method == "kmeans":
+                labels = kmeans(adata_feat, n_clusters)
+            else:
+                resolution = res_search_fixed_clus(adata_feat, n_clusters)
+                if method =="leiden":
+                    labels = leiden(adata_feat, resolution)
+                else:
+                    labels = louvain(adata_feat, resolution)
+            np.savetxt(cluster_fp, labels, fmt='%d', header='', footer='', comments='')
+            print("Saved %s succesful!" % cluster_fp)
     else:
         print(f"Error in clustering, the feature fp: {feature_fp} not exist")

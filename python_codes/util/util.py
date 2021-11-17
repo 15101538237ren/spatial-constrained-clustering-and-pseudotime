@@ -64,7 +64,7 @@ def preprocessing_data(args, adata):
     cut = estimate_cutoff_knn(coords, k=args.n_neighbors_for_knn_graph)
     spatial_graph = graph_alpha(coords, cut=cut, n_layer=args.alpha_n_layer)
     spatial_dists = distance.cdist(coords, coords, 'euclidean')
-    spatial_dists = F.normalize(torch.tensor(spatial_dists).float())
+    spatial_dists = torch.tensor(spatial_dists / np.max(spatial_dists)).float()
     return expr, genes, cells, spatial_graph, spatial_dists
 
 def estimate_cutoff_knn(pts, k=10):

@@ -20,3 +20,16 @@ done
 
 #Rscript DLPFC.ARI_boxplot.R
 
+
+
+
+BASE_DIR=/Users/emmanueldollinger/PycharmProjects/spatial-constrained-clustering-and-pseudotime
+SOURCE_DIR=/Users/emmanueldollinger/PycharmProjects/SEDR
+cd $BASE_DIR
+
+declare -a samples=('151507' '151508' '151509' '151510' '151669' '151670' '151672' '151673' '151674' '151675' '151676' '151671')
+
+for i in "${!samples[@]}"; do 
+  	echo "sample: "$sample
+  	#cp -r $SOURCE_DIR/output/DLPFC/$sample/BayesSpace $BASE_DIR/output/DLPFC/$sample
+done

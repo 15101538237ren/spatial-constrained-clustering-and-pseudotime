@@ -39,7 +39,8 @@ def train(args, expr, sp_graph, sp_dists, random_seed = 42):
 
         if args.spatial:
             n, in_dim = expr.shape
-            z_dists = F.normalize(torch.cdist(z, z, p=2))
+            z_dists = torch.cdist(z, z, p=2)
+            z_dists = torch.div(z_dists, torch.max(z_dists)).to(args.device)
             penalty_1 = torch.div(torch.sum(torch.mul(1.0 - z_dists, sp_dists)), n * n).to(args.device)
             loss = loss + args.penalty_scaler * penalty_1
 
