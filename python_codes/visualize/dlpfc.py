@@ -28,6 +28,11 @@ def figure(nrow, ncol, sz=4):
     plt.subplots_adjust(wspace=0.4, hspace=0.5, bottom=0.2)
     return fig, axs
 
+def get_annotations(args, sample_name, dataset="DLPFC"):
+    data_root = f'{args.dataset_dir}/{dataset}/{sample_name}'
+    df_meta = pd.read_csv(f"{data_root}/metadata.tsv", sep='\t')
+    anno_clusters = df_meta['layer_guess'].values.astype(str)
+    return anno_clusters
 def plot_hne_and_annotation(args, sample_name, dataset="DLPFC", HnE=False, cm = plt.get_cmap("plasma"), scale = 0.045):
     ncol = 4 if HnE else 3
     subfig_offset = 1 if HnE else 0
@@ -36,8 +41,7 @@ def plot_hne_and_annotation(args, sample_name, dataset="DLPFC", HnE=False, cm = 
     adata = load_ST_file(data_root)
     coord = adata.obsm['spatial'].astype(float) * scale
     x, y = coord[:, 0], coord[:, 1]
-    df_meta = pd.read_csv(f"{data_root}/metadata.tsv", sep='\t')
-    anno_clusters = df_meta['layer_guess'].values.astype(str)
+    anno_clusters = get_annotations(args, sample_name)
     img = plt.imread(f"{data_root}/spatial/tissue_lowres_image.png")
     limits = [80, 550]
 

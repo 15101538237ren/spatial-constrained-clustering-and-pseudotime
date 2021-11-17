@@ -10,7 +10,7 @@ def mkdir(dir_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
 
-def pseudotime(args, dataset, sample_name, n_neighbors=50):
+def pseudotime(args, dataset, sample_name, n_neighbors=50, root_cell_type = None, cell_types=None):
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     feature_fp = os.path.join(output_dir, "features.tsv")
     pseudotime_fp = os.path.join(output_dir, "pseudotime.tsv")
@@ -21,7 +21,14 @@ def pseudotime(args, dataset, sample_name, n_neighbors=50):
         sc.tl.leiden(adata, resolution=.8)
         sc.tl.paga(adata)
         distances = distance_matrix(adata.X, adata.X)
-        adata.uns['iroot'] = np.argmax(distances.sum(axis=1))
+        sum_dists = distances.sum(axis=1)
+        adata.uns['iroot'] = np.argmax(sum_dists)
+        if root_cell_type:
+            descend_dist_inds = sorted(range(len(sum_dists)), key=lambda k:sum_dists[k], reverse=True)
+            for root_idx in descend_dist_inds:
+                if cell_types[root_idx] == root_cell_type:
+                    adata.uns['iroot'] = root_idx
+                    break
         sc.tl.diffmap(adata)
         sc.tl.dpt(adata)
         pseudotimes = adata.obs['dpt_pseudotime'].to_numpy()
