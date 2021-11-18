@@ -54,14 +54,14 @@ def plot_hne_and_annotation(args, sample_name, dataset="DLPFC", HnE=False, cm = 
         ax.invert_yaxis()
     ax = axs[subfig_offset]
     ax.set_title("Annotation")
-    uniq_annots = np.unique(anno_clusters)
+    uniq_annots = [cluster for cluster in np.unique(anno_clusters) if cluster != 'nan']
     for cid, cluster in enumerate(uniq_annots):
-        if cluster != 'nan':
-            color = cm(1. * cid / (len(uniq_annots) + 1))
-            ind = anno_clusters == cluster
-            ax.scatter(x[ind], y[ind], s=1, color=color, label=cluster)
+        color = cm(1. * cid / len(uniq_annots))
+        ind = anno_clusters == cluster
+        ax.scatter(x[ind], y[ind], s=1, color=color, label=cluster)
     ax.legend()
     return fig, axs, x, y, subfig_offset
+
 def plot_clustering(args, sample_name, method="leiden", dataset="DLPFC", HnE=False, cm = plt.get_cmap("plasma"), scale = 0.045):
     original_spatial = args.spatial
     fig, axs, x, y, subfig_offset = plot_hne_and_annotation(args, sample_name, HnE=HnE, cm=cm, scale=scale)
@@ -73,7 +73,7 @@ def plot_clustering(args, sample_name, method="leiden", dataset="DLPFC", HnE=Fal
         pred_clusters = pd.read_csv(f"{output_dir}/{method}.tsv", header=None).values.flatten().astype(int)
         uniq_pred = np.unique(pred_clusters)
         for cid, cluster in enumerate(uniq_pred):
-            color = cm(1. * cid / (len(uniq_pred) + 1))
+            color = cm(1. * cid / len(uniq_pred))
             ind = pred_clusters == cluster
             ax.scatter(x[ind], y[ind], s=1, color=color, label=cluster)
         title = args.arch if not spatial else "%s + SP" % args.arch

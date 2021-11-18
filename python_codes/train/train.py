@@ -2,7 +2,6 @@
 import random
 import torch
 import numpy as np
-import torch.nn.functional as F
 from python_codes.models.model_hub import get_model
 
 def sparse_mx_to_torch_edge_list(sparse_mx):
@@ -11,7 +10,7 @@ def sparse_mx_to_torch_edge_list(sparse_mx):
         np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64))
     return edge_list
 
-def train(args, expr, sp_graph, sp_dists, random_seed = 42):
+def train(args, expr, sp_graph, sp_dists, random_seed = 6252):
     torch.manual_seed(random_seed)
     random.seed(random_seed)
     np.random.seed(random_seed)
@@ -24,7 +23,6 @@ def train(args, expr, sp_graph, sp_dists, random_seed = 42):
     expr = expr.to(args.device)
     sp_dists = sp_dists.to(args.device)
     edge_list = sparse_mx_to_torch_edge_list(sp_graph).to(args.device)
-
     model.train()
     min_loss = np.inf
     patience = 0

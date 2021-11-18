@@ -16,7 +16,7 @@ parser.add_argument('--patience', type=int, default=50)
 parser.add_argument('--min_stop', type=int, default=100)
 parser.add_argument('--epochs', type=int, default=1000)
 parser.add_argument('--lr', type=float, default=0.001)
-parser.add_argument('--penalty_scaler', type=float, default=1.0)
+parser.add_argument('--penalty_scaler', type=float, default=1)
 parser.add_argument('--dataset_dir', type=str, default='../data')
 parser.add_argument('--output_dir', type=str, default='../output')
 

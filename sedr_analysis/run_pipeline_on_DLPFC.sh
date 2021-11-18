@@ -30,6 +30,7 @@ cd $BASE_DIR
 declare -a samples=('151507' '151508' '151509' '151510' '151669' '151670' '151672' '151673' '151674' '151675' '151676' '151671')
 
 for i in "${!samples[@]}"; do 
+	sample="${samples[i]}"
   	echo "sample: "$sample
-  	#cp -r $SOURCE_DIR/output/DLPFC/$sample/BayesSpace $BASE_DIR/output/DLPFC/$sample
+  	cp -r $SOURCE_DIR/output/DLPFC/$sample/BayesSpace $BASE_DIR/output/DLPFC/$sample
 done

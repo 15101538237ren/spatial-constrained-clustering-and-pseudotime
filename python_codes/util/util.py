@@ -6,7 +6,6 @@ import numpy as np
 import scanpy as sc
 import pandas as pd
 import networkx as nx
-import torch.nn.functional as F
 from scipy.spatial import distance
 from sklearn.neighbors import kneighbors_graph
 
@@ -39,27 +38,28 @@ def load_ST_file(file_fold, count_file='filtered_feature_bc_matrix.h5', load_ima
     return adata_h5
 
 
-def load_DLPFC_data(args, sample_name):
-    data_root = f'{args.dataset_dir}/DLPFC'
-    file_fold = f'{data_root}/{sample_name}'
-    adata_h5 = load_ST_file(file_fold=file_fold)
-    return adata_h5
+def load_DLPFC_data(args, sample_name, v2=True):
+    if v2:
+        file_fold = f'{args.dataset_dir}/DLPFC_v2/{sample_name}'
+        adata = sc.read_10x_mtx(file_fold)
+        adata.obsm['spatial'] = pd.read_csv(f"{file_fold}/spatial_coords.csv").values.astype(float)
+    else:
+        file_fold = f'{args.dataset_dir}/DLPFC/{sample_name}'
+        adata = load_ST_file(file_fold=file_fold)
+    return adata
 
 def preprocessing_data(args, adata):
     sc.pp.filter_genes(adata, min_counts=1)  # only consider genes with more than 1 count
     sc.pp.normalize_per_cell(adata, key_n_counts='n_counts_all', min_counts=0)  # normalize with total UMI count per cell
-    filter_result = sc.pp.filter_genes_dispersion(adata.X, flavor='cell_ranger',log=False)
-    adata_X = adata[:, filter_result.gene_subset]  # subset the genes
+    sc.pp.filter_genes_dispersion(adata, flavor='cell_ranger',log=False, subset=True)
+    sc.pp.normalize_per_cell(adata, min_counts=0)  # renormalize after filtering
+    sc.pp.log1p(adata)  # log transform: adata.X = log(adata.X + 1)
+    print('adata after filtered: (' + str(adata.shape[0]) + ', ' + str(adata.shape[1]) + ')')
 
-    sc.pp.normalize_per_cell(adata_X, min_counts=0)  # renormalize after filtering
-    sc.pp.log1p(adata_X)  # log transform: adata.X = log(adata.X + 1)
-
-    print('adata after filtered: (' + str(adata_X.shape[0]) + ', ' + str(adata_X.shape[1]) + ')')
-
-    genes = list(adata_X.var_names)
-    cells = list(adata_X.obs_names)
-    coords = adata_X.obsm['spatial']
-    expr = adata_X.X.todense() if type(adata_X.X).__module__ != np.__name__ else adata_X.X
+    genes = list(adata.var_names)
+    cells = list(adata.obs_names)
+    coords = adata.obsm['spatial']
+    expr = adata.X.todense() if type(adata.X).__module__ != np.__name__ else adata.X
     expr = torch.tensor(expr).float()
     cut = estimate_cutoff_knn(coords, k=args.n_neighbors_for_knn_graph)
     spatial_graph = graph_alpha(coords, cut=cut, n_layer=args.alpha_n_layer)
