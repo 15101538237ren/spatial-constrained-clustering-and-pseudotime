@@ -10,7 +10,7 @@ def sparse_mx_to_torch_edge_list(sparse_mx):
         np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64))
     return edge_list
 
-def train(args, expr, sp_graph, sp_dists, random_seed = 6252):
+def train(args, expr, sp_graph, sp_dists, random_seed = 42):
     torch.manual_seed(random_seed)
     random.seed(random_seed)
     np.random.seed(random_seed)

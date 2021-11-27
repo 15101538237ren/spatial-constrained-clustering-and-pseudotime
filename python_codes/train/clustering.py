@@ -48,7 +48,7 @@ def clustering(args, dataset, sample_name, method = "leiden", n_neighbors=50):
 
         sc.pp.neighbors(adata_feat, n_neighbors=n_neighbors, use_rep='X')
         if dataset == "DLPFC":
-            n_clusters = 5# if sample_name in ['151669', '151670', '151671', '151672'] else 6
+            n_clusters = 5 if sample_name in ['151669', '151670', '151671', '151672'] else 6
             if method == "kmeans":
                 labels = kmeans(adata_feat, n_clusters)
             else:

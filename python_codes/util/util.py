@@ -39,7 +39,7 @@ def load_ST_file(file_fold, count_file='filtered_feature_bc_matrix.h5', load_ima
 
 
 def load_DLPFC_data(args, sample_name, v2=True):
-    if v2:
+    if v2 and sample_name != '151675':
         file_fold = f'{args.dataset_dir}/DLPFC_v2/{sample_name}'
         adata = sc.read_10x_mtx(file_fold)
         adata.obsm['spatial'] = pd.read_csv(f"{file_fold}/spatial_coords.csv").values.astype(float)
@@ -54,6 +54,7 @@ def preprocessing_data(args, adata):
     sc.pp.filter_genes_dispersion(adata, flavor='cell_ranger',log=False, subset=True)
     sc.pp.normalize_per_cell(adata, min_counts=0)  # renormalize after filtering
     sc.pp.log1p(adata)  # log transform: adata.X = log(adata.X + 1)
+    sc.pp.pca(adata)  # log transform: adata.X = log(adata.X + 1)
     print('adata after filtered: (' + str(adata.shape[0]) + ', ' + str(adata.shape[1]) + ')')
 
     genes = list(adata.var_names)
@@ -65,7 +66,7 @@ def preprocessing_data(args, adata):
     spatial_graph = graph_alpha(coords, cut=cut, n_layer=args.alpha_n_layer)
     spatial_dists = distance.cdist(coords, coords, 'euclidean')
     spatial_dists = torch.tensor(spatial_dists / np.max(spatial_dists)).float()
-    return expr, genes, cells, spatial_graph, spatial_dists
+    return adata, expr, genes, cells, spatial_graph, spatial_dists
 
 def estimate_cutoff_knn(pts, k=10):
     A_knn = kneighbors_graph(pts, n_neighbors=k, mode='distance')

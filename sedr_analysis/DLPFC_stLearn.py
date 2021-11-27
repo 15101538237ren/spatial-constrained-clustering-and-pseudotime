@@ -97,7 +97,7 @@ methods_ = "stSME_disk"
 results_df = calculate_clustering_matrix(data_.obs["X_pca_kmeans"], ground_truth_le, sample, methods_)
 plt.savefig(OUTPUT_PATH / 'cluster.png')
 
-data_.obs.to_csv(OUTPUT_PATH / 'metadata.tsv', sep='\t', index=False)
+data_.obs.to_csv(OUTPUT_PATH / 'metadata.tsv', sep='\t', index=False, header=False)
 
 
 df_PCA = pd.DataFrame(data = data_.obsm['X_pca'], index = data_.obs.index)
