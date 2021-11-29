@@ -29,7 +29,7 @@ def figure(nrow, ncol, rsz=3., csz=3., wspace=.4, hspace=.5):
     plt.subplots_adjust(wspace=wspace, hspace=hspace)
     return fig, axs
 
-def get_annotations(args, sample_name, dataset="DLPFC"):
+def get_annotations_dlpfc(args, sample_name, dataset="DLPFC"):
     data_root = f'{args.dataset_dir}/{dataset}/{sample_name}'
     df_meta = pd.read_csv(f"{data_root}/metadata.tsv", sep='\t')
     anno_clusters = df_meta['layer_guess'].values.astype(str)

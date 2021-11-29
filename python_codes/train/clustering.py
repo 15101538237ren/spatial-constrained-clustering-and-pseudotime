@@ -38,7 +38,7 @@ def kmeans(adata, ncluster=7):
     labels = kmeans.labels_
     return labels
 
-def clustering(args, dataset, sample_name, method = "leiden", n_neighbors=50):
+def clustering(args, dataset, sample_name, method = "leiden", n_neighbors=50, resolution=1.0):
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     feature_fp = os.path.join(output_dir, f"features.tsv")
     cluster_fp = os.path.join(output_dir, f"{method}.tsv")
@@ -58,7 +58,10 @@ def clustering(args, dataset, sample_name, method = "leiden", n_neighbors=50):
                     labels = leiden(adata_feat, resolution)
                 else:
                     labels = louvain(adata_feat)
-            np.savetxt(cluster_fp, labels, fmt='%d', header='', footer='', comments='')
-            print("Saved %s succesful!" % cluster_fp)
+        else:
+            labels = leiden(adata_feat, resolution)
+        np.savetxt(cluster_fp, labels, fmt='%d', header='', footer='', comments='')
+        print("Saved %s succesful!" % cluster_fp)
+
     else:
         print(f"Error in clustering, the feature fp: {feature_fp} not exist")

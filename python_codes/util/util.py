@@ -48,6 +48,11 @@ def load_DLPFC_data(args, sample_name, v2=True):
         adata = load_ST_file(file_fold=file_fold)
     return adata
 
+def load_chicken_data(args, sample_name):
+    file_fold = f'{args.dataset_dir}/Visium/Chicken_Dev/ST/{sample_name}'
+    adata = load_ST_file(file_fold=file_fold)
+    return adata
+
 def preprocessing_data(args, adata):
     sc.pp.filter_genes(adata, min_counts=1)  # only consider genes with more than 1 count
     sc.pp.normalize_per_cell(adata, key_n_counts='n_counts_all', min_counts=0)  # normalize with total UMI count per cell
