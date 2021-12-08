@@ -53,10 +53,10 @@ def load_chicken_data(args, sample_name):
     adata = load_ST_file(file_fold=file_fold)
     return adata
 
-def preprocessing_data(args, adata):
+def preprocessing_data(args, adata, n_top_genes=None):
     sc.pp.filter_genes(adata, min_counts=1)  # only consider genes with more than 1 count
     sc.pp.normalize_per_cell(adata, key_n_counts='n_counts_all', min_counts=0)  # normalize with total UMI count per cell
-    sc.pp.filter_genes_dispersion(adata, flavor='cell_ranger',log=False, subset=True)
+    sc.pp.filter_genes_dispersion(adata, flavor='cell_ranger',log=False, subset=True, n_top_genes=n_top_genes)
     sc.pp.normalize_per_cell(adata, min_counts=0)  # renormalize after filtering
     sc.pp.log1p(adata)  # log transform: adata.X = log(adata.X + 1)
     sc.pp.pca(adata)  # log transform: adata.X = log(adata.X + 1)
