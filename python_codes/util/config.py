@@ -5,7 +5,7 @@ parser = argparse.ArgumentParser()
 # params to change
 parser.add_argument('--gpu', type=int, default=7)
 parser.add_argument('--arch', type=str, default='DGI')
-parser.add_argument('--spatial', type=bool, default=False)
+parser.add_argument('--spatial', type=bool, default=True)
 parser.add_argument('--n_neighbors_for_knn_graph', type=int, default=10)
 parser.add_argument('--alpha_n_layer', type=int, default=1)
 parser.add_argument('--z_dim', type=int, default=50)

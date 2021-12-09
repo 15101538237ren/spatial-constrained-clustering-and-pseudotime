@@ -171,6 +171,67 @@ def get_phate_by_adata(adata):
     data_phate = phate_op.fit_transform(adata.X)
     return phate_op, data_phate
 
+
+def get_clusters(args, sample_name, method="leiden", dataset="chicken"):
+    original_spatial = args.spatial
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    pred_clusters = pd.read_csv(f"{output_dir}/{method}.tsv", header=None).values.flatten().astype(str)
+    args.spatial = original_spatial
+    return pred_clusters
+
+def get_combined_annotations(days, clusters):
+    return np.array([f"{day}-{clusters[did]}"for did, day in enumerate(days)])
+
+def get_combined_merged_annotations(days, clusters):
+    return np.array(["%s-%s" % (day, clusters[did].split('-')[0]) for did, day in enumerate(days)])
+
+def get_annotation_color_arr(args, cluster_annotations, days, regions):
+    cluster_annotations_color_dict = get_cluster_colors_dict(args)
+    cluster_colors = [cluster_annotations_color_dict[anno] for anno in cluster_annotations]
+
+    days_color_dict = get_day_colors()
+    days_colors = [days_color_dict[anno] for anno in days]
+
+    # _, cell_type_color_dict = get_cell_type_annotation_colors()
+    # cell_type_colors = [cell_type_color_dict[anno] for anno in cell_types]
+    _, region_color_dict = get_region_annotation_colors()
+    region_colors = [region_color_dict[anno] for anno in regions]
+    return [cluster_colors, days_colors, region_colors], [cluster_annotations_color_dict, days_color_dict, region_color_dict]
+
+def get_pseudotime(adata, resolution = .8, n_neighbors = 10):
+    sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
+    sc.tl.umap(adata)
+    sc.tl.leiden(adata, resolution=resolution)
+    sc.tl.paga(adata)
+    expr = adata.obsm["X_pca"]
+    distances = distance_matrix(expr, expr)
+    sum_dists = distances.sum(axis=1)
+    adata.uns['iroot'] = np.argmax(sum_dists)
+    sc.tl.diffmap(adata)
+    sc.tl.dpt(adata)
+    pseudotimes = adata.obs['dpt_pseudotime'].to_numpy()
+    return pseudotimes
+
+def isAnnotationInLineage(anno, lineages):
+    for lineage in lineages:
+        if anno.startswith(lineage):
+            return True
+    return False
+
+def get_top_n_cluster_specific_genes(args,  sample_name, method, dataset="chicken", top_n=3):
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    cluster_marker_genes_fp = f'{output_dir}/marker_genes_pval_gby_{method}.tsv'
+    df = pd.read_csv(cluster_marker_genes_fp, sep="\t")
+    df = df.loc[:top_n, df.columns.str.endswith("_n")]
+    df = df.loc[:top_n, ~df.columns.str.startswith("D4")]
+    genes = np.array(np.unique(df.values.flatten().astype(str)))
+    output_fp = f'{output_dir}/unique_cluster_specific_marker_genes_top_{top_n}.tsv'
+    np.savetxt(output_fp, genes[:], delimiter="\n", fmt="%s")
+    print(f"Saved at {output_fp}")
+    return genes
+
 ####################################
 #----------Data Processing---------#
 ####################################
@@ -197,6 +258,24 @@ def merge_adatas_annotations_chicken(adatas, cluster_annotations, cell_types, re
     merged_regions = np.concatenate(regions, axis=0)
     merged_days = np.concatenate(days, axis=0)
     return merged_adata, merged_cluster_annotations, merged_cell_types, merged_regions, merged_days
+
+def cell_cell_communication_preprocessing_data(args, adata):
+    sc.pp.filter_genes(adata, min_counts=1)  # only consider genes with more than 1 count
+    sc.pp.normalize_per_cell(adata, key_n_counts='n_counts_all', min_counts=0)  # normalize with total UMI count per cell
+    sc.pp.log1p(adata)  # log transform: adata.X = log(adata.X + 1)
+
+    genes = np.array(adata.var_names)
+    cells = np.array(adata.obs_names)
+    return adata, genes, cells
+
+
+def save_background_genes(args, adata, sample_name, dataset="chicken"):
+    genes = adata.var_names.astype(str)
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    output_fp = f'{output_dir}/background_genes.tsv'
+    np.savetxt(output_fp, genes[:], delimiter="\n", fmt="%s")
+    print(f"Saved at {output_fp}")
 
 ####################################
 #-------------Plotting-------------#
@@ -289,14 +368,6 @@ def plot_phate(args, sample_name, expr, anno_clusters, dataset="chicken", cm = p
     phate.plot.scatter2d(data_phate, c=anno_clusters, cmap=cm, s=6, filename=fig_fp, legend_title="Cell Types", dpi=300,
                          figsize=(8, 8),
                          ticks=False, label_prefix="PHATE")
-
-def get_clusters(args, sample_name, method="leiden", dataset="chicken"):
-    original_spatial = args.spatial
-    args.spatial = True
-    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
-    pred_clusters = pd.read_csv(f"{output_dir}/{method}.tsv", header=None).values.flatten().astype(str)
-    args.spatial = original_spatial
-    return pred_clusters
 
 def plot_rank_marker_genes_group(args, sample_name, adata_filtered, group_values, method="cluster", dataset="chicken"):
     original_spatial = args.spatial
@@ -706,26 +777,6 @@ def plot_phate_pseudotime(args, lineage, lineage_adata, days, dataset="chicken",
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
-def get_pseudotime(adata, resolution = .8, n_neighbors = 10):
-    sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
-    sc.tl.umap(adata)
-    sc.tl.leiden(adata, resolution=resolution)
-    sc.tl.paga(adata)
-    expr = adata.obsm["X_pca"]
-    distances = distance_matrix(expr, expr)
-    sum_dists = distances.sum(axis=1)
-    adata.uns['iroot'] = np.argmax(sum_dists)
-    sc.tl.diffmap(adata)
-    sc.tl.dpt(adata)
-    pseudotimes = adata.obs['dpt_pseudotime'].to_numpy()
-    return pseudotimes
-
-def isAnnotationInLineage(anno, lineages):
-    for lineage in lineages:
-        if anno.startswith(lineage):
-            return True
-    return False
-
 def plot_lineage_pseudotime(args, adatas, annotations_list, lineage, lineage_adata, days, dataset="chicken", scatter_sz= 4, cm = plt.get_cmap("gist_rainbow")):
     args.spatial = True
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, lineage)}'
@@ -823,19 +874,6 @@ def hiearchical_clustering_heatmap(args, data, lineage_name, annotation_types, a
         g.ax_row_dendrogram.legend(title=annotation_types[aid], loc=f'center right', ncol=1, bbox_to_anchor=locs[aid])
     g.savefig(fig_fp, dpi=300)
 
-def get_annotation_color_arr(args, cluster_annotations, days, regions):
-    cluster_annotations_color_dict = get_cluster_colors_dict(args)
-    cluster_colors = [cluster_annotations_color_dict[anno] for anno in cluster_annotations]
-
-    days_color_dict = get_day_colors()
-    days_colors = [days_color_dict[anno] for anno in days]
-
-    # _, cell_type_color_dict = get_cell_type_annotation_colors()
-    # cell_type_colors = [cell_type_color_dict[anno] for anno in cell_types]
-    _, region_color_dict = get_region_annotation_colors()
-    region_colors = [region_color_dict[anno] for anno in regions]
-    return [cluster_colors, days_colors, region_colors], [cluster_annotations_color_dict, days_color_dict, region_color_dict]
-
 def heatmap_pipeline(args, all_lineage=True):
     sample_list = ['D7', 'D10', 'D14']
     adatas, cell_types, regions, days = [], [], [], []
@@ -879,19 +917,41 @@ def heatmap_pipeline(args, all_lineage=True):
                                    [merged_cluster_annotations, merged_days, merged_regions], color_dict_arr,
                                    annotation_colors_arr)
 
-def get_combined_annotations(days, clusters):
-    return np.array([f"{day}-{clusters[did]}"for did, day in enumerate(days)])
+def get_labeled_cluster_annotations(args, sample, annotation_colors_dict, dataset="chicken", cluster_method = "leiden"):
+    cluster_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample)}'
+    pred_clusters = pd.read_csv(f"{cluster_dir}/{cluster_method}.tsv", header=None).values.flatten().astype(int)
+    cluster_annotations = np.array([annotation_colors_dict[cluster][0] for cluster in pred_clusters]).astype(str)
+    return cluster_annotations
 
-def get_combined_merged_annotations(days, clusters):
-    return np.array(["%s-%s" % (day, clusters[did].split('-')[0]) for did, day in enumerate(days)])
+def save_adata_to_preprocessing_dir(args, adata_pp, sample, cells, color_dict):
+    pp_dir = f'{args.dataset_dir}/Visium/Chicken_Dev/preprocessed/{sample}'
+    mkdir(pp_dir)
 
-def get_top_n_cluster_specific_genes(args, sample_name, method, dataset="chicken", top_n=3):
-    args.spatial = True
-    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
-    cluster_marker_genes_fp = f'{output_dir}/marker_genes_pval_gby_{method}.tsv'
-    df = pd.read_csv(cluster_marker_genes_fp, sep="\t")
-    genes = df.loc[:top_n, df.columns.str.endswith("_n")].values.flatten().astype(str)
-    return np.unique(genes)
+    cluster_annotations = get_labeled_cluster_annotations(args, sample, color_dict)
+    concat_annotations = np.transpose(np.vstack([cells, cluster_annotations]))
+    annotation_fp = f'{pp_dir}/cluster_anno.tsv'
+    df = pd.DataFrame(data=concat_annotations, columns=["Cell", "Annotation"])
+    df.to_csv(annotation_fp, sep="\t", index=False)
+    print(f"{sample} annotation saved at {annotation_fp}")
+
+    adata_fp = f'{pp_dir}/anndata_pp.h5ad'
+    mkdir(os.path.dirname(adata_fp))
+    adata_pp.write(adata_fp)
+    print(f"{sample} adata saved at {adata_fp}")
+
+
+def cell_cell_communication_prep_pipeline(args):
+    sample_list = ['D4', 'D7', 'D10', 'D14']
+    annotation_colors = get_cluster_colors(args, sample_list)
+    for sid, sample in enumerate(sample_list):
+        adata = load_chicken_data(args, sample)
+        adata_pp, genes, cells = cell_cell_communication_preprocessing_data(args, adata)
+        save_adata_to_preprocessing_dir(args, adata_pp, sample, cells, annotation_colors[sid])
+
+def gene_ontology_pipeline(args):
+    lineage = "_".join(["Valve cells", "MT-enriched valve cells"])
+    save_background_genes(args, load_chicken_data(args, "D14"), lineage)
+    top_n_cluster_specific_genes = get_top_n_cluster_specific_genes(args, lineage, method="combined_cluster", top_n=10)
 
 def lineage_pipeline(args, all_lineage=False):
     sample_list = ['D4', 'D7', 'D10', 'D14']#
