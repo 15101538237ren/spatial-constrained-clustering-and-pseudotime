@@ -53,6 +53,19 @@ def load_chicken_data(args, sample_name):
     adata = load_ST_file(file_fold=file_fold)
     return adata
 
+def load_breast_cancer_data(args, sample_name):
+    base_dir = f"{args.dataset_dir}/Visium/Breast_Cancer"
+    count_fp = f'{base_dir}/ST-cnts/{sample_name}.tsv'
+    adata = sc.read_csv(count_fp, delimiter='\t', first_column_names=True)
+    coord_fp = f'{base_dir}/ST-spotfiles/{sample_name}_selection.tsv'
+    coord_df = pd.read_csv(coord_fp, delimiter='\t')
+    spots_idx_dicts = {f"{item[0]}x{item[1]}" : idx for idx, item in enumerate(coord_df[["x", "y"]].values.astype(int))}
+    spots_selected = np.array([sid for sid, spot in enumerate(list(adata.obs_names)) if spot in spots_idx_dicts]).astype(int)
+    adata = adata[spots_selected, :]
+    coords = coord_df[["pixel_x", "pixel_y"]].values
+    adata.obsm["spatial"] = np.array([coords[spots_idx_dicts[spot]] for spot in adata.obs_names])
+    return adata
+
 def preprocessing_data(args, adata, n_top_genes=None):
     sc.pp.filter_genes(adata, min_counts=1)  # only consider genes with more than 1 count
     sc.pp.normalize_per_cell(adata, key_n_counts='n_counts_all', min_counts=0)  # normalize with total UMI count per cell

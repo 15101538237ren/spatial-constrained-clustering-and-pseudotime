@@ -8,7 +8,7 @@ import seaborn as sns
 from scipy.spatial.distance import cdist
 from scipy.spatial import distance_matrix
 from sklearn.decomposition import PCA
-from python_codes.train.train import train
+#from python_codes.train.train import train
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
 from python_codes.util.util import load_chicken_data, preprocessing_data, save_features
@@ -111,9 +111,38 @@ def get_region_annotation_colors():
     }
     return annotations_names, annotation_colors
 
+def annotation_dict():
+    ann_dict = {
+         "Valve cells-1": "Valve-1",
+         "Valve cells-2": "Valve-2",
+         "Valve cells-3": "Valve-3",
+         "Valve cells-4": "Valve-4",
+         "Immature myocardial cells-1": "Imm.Myo-1",
+         "Immature myocardial cells-2": "Imm.Myo-2",
+         "Immature myocardial cells-3": "Imm.Myo-3",
+         "Immature myocardial cells-4": "Imm.Myo-4",
+         "Immature myocardial cells-5": "Imm.Myo-5",
+         "Cardiomyocytes-1": "Card.Myo-1",
+         "Cardiomyocytes-2": "Card.Myo-2",
+         "Cardiomyocytes-3": "Card.Myo-3",
+         "Cardiomyocytes-4": "Card.Myo-4",
+         "Cardiomyocytes-5": "Card.Myo-5",
+         "Cardiomyocytes-6": "Card.Myo-6",
+         "Cardiomyocytes-7": "Card.Myo-7",
+         "Cardiomyocytes-8": "Card.Myo-8",
+         "Cardiomyocytes-9": "Card.Myo-9",
+         "Epicardial cells": "Epicard-1",
+         "Epicardial cells-1": "Epicard-1",
+         "Epicardial cells-2": "Epicard-2",
+         "Epicardial cells-3": "Epicard-3",
+         "Fibroblast cells": "Fibroblast",
+    }
+    return ann_dict
+
 def get_cluster_colors(args, time_points):
     data_root = f'{args.dataset_dir}/Visium/Chicken_Dev/putative_cell_type_colors'
     annotation_colors = []
+    ann_dict = annotation_dict()
     for day in time_points:
         df = pd.read_csv(f"{data_root}/{day}.csv")
         clusters = df["Cluster ID"].values.astype(int)
@@ -121,7 +150,7 @@ def get_cluster_colors(args, time_points):
         colors = df["Color"].values.astype(str)
         cur_dict = {}
         for cid, cluster in enumerate(clusters):
-            cur_dict[cluster] = [annotations[cid], colors[cid]]
+            cur_dict[cluster] = [ann_dict[annotations[cid]], colors[cid]]
         annotation_colors.append(cur_dict)
 
     return annotation_colors
@@ -184,7 +213,7 @@ def get_combined_annotations(days, clusters):
     return np.array([f"{day}-{clusters[did]}"for did, day in enumerate(days)])
 
 def get_combined_merged_annotations(days, clusters):
-    return np.array(["%s-%s" % (day, clusters[did].split('-')[0]) for did, day in enumerate(days)])
+    return np.array(["%s-%s" % (day, clusters[did].split("-")[0]) for did, day in enumerate(days)])
 
 def get_annotation_color_arr(args, cluster_annotations, days, regions):
     cluster_annotations_color_dict = get_cluster_colors_dict(args)
@@ -369,19 +398,20 @@ def plot_phate(args, sample_name, expr, anno_clusters, dataset="chicken", cm = p
                          figsize=(8, 8),
                          ticks=False, label_prefix="PHATE")
 
-def plot_rank_marker_genes_group(args, sample_name, adata_filtered, group_values, method="cluster", dataset="chicken"):
+def plot_rank_marker_genes_group(args, sample_name, adata_filtered, group_values, method="cluster", dataset="chicken", top_n_genes=3):
     original_spatial = args.spatial
     args.spatial = True
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     adata_filtered.obs[method] = pd.Categorical(group_values)
     sc.tl.rank_genes_groups(adata_filtered, method, method='wilcoxon')
     sc.pl.rank_genes_groups(adata_filtered, n_genes=25, ncols=5, fontsize=10, sharey=False, save=f"{sample_name}_ranks_gby_{method}.pdf")
-    sc.pl.rank_genes_groups_heatmap(adata_filtered, n_genes=3, standard_scale='var', save=f"{sample_name}_heatmap_gby_{method}.pdf")
-    sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=3, standard_scale='var', save=f"{sample_name}_mean_expr_gby_{method}.pdf")
-    sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=3, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save=f"{sample_name}_dot_lfc_gby_{method}.pdf")
-    sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=3, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save=f"{sample_name}_matrix_lfc_gby_{method}.pdf")
+    sc.pl.rank_genes_groups_heatmap(adata_filtered, n_genes=top_n_genes, standard_scale='var',  show_gene_labels=True, save=f"{sample_name}_heatmap_gby_{method}.pdf")
+    sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=top_n_genes, standard_scale='var', save=f"{sample_name}_mean_expr_gby_{method}.pdf")
+    sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=top_n_genes, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save=f"{sample_name}_dot_lfc_gby_{method}.pdf")
+    sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=top_n_genes, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save=f"{sample_name}_matrix_lfc_gby_{method}.pdf")
     args.spatial = original_spatial
     cluster_marker_genes_fp = f'{output_dir}/marker_genes_pval_gby_{method}.tsv'
+    mkdir(os.path.dirname(cluster_marker_genes_fp))
     result = adata_filtered.uns['rank_genes_groups']
     groups = result['names'].dtype.names
     df = pd.DataFrame(
@@ -450,25 +480,30 @@ def plot_annotated_clusters(args, adatas, sample_name="merged", dataset="chicken
     output_dir = f'{args.output_dir}/{dataset}/{sample_name}'
     mkdir(output_dir)
     samples = ['D4', 'D7', 'D10', 'D14']
-    fig, axs = figure(1, len(samples), rsz=2.8, csz=5.3, wspace=.5, hspace=.4)
+    fig, axs = figure(1, len(samples), rsz=2.8, csz=4.8, wspace=.5, hspace=.4)
     annotation_colors = get_cluster_colors(args, samples)
+    box_ratios = [.8, .8, .9, .7]
     for sid, sample in enumerate(samples):
         ax = axs[sid]
         ax.axis('off')
         coord = adatas[sid].obsm['spatial'].astype(float)
         x, y = coord[:, 0], coord[:, 1]
-        box_width_ratio = .8 if sample != "D14" else .6
         cluster_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample)}'
         pred_clusters = pd.read_csv(f"{cluster_dir}/{method}.tsv", header=None).values.flatten().astype(int)
         uniq_pred = np.unique(pred_clusters)
         uniq_pred = sorted(uniq_pred, key=lambda cluster: annotation_colors[sid][cluster][0])
+        set_labels = set({})
         for cid, cluster in enumerate(uniq_pred):
             ind = pred_clusters == cluster
             label, color = annotation_colors[sid][cluster]
-            ax.scatter(x[ind], y[ind], s=scatter_sz, color=f"#{color}", label=label)
+            if label not in set_labels:
+                set_labels.add(label)
+                ax.scatter(x[ind], y[ind], s=scatter_sz, color=f"#{color}", label=label)
+            else:
+                ax.scatter(x[ind], y[ind], s=scatter_sz, color=f"#{color}")
 
         box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * box_width_ratio, box.height])
+        ax.set_position([box.x0, box.y0, box.width * box_ratios[sid], box.height])
         lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5))
         for handle in lgnd.legendHandles:
             handle._sizes = [10]
@@ -477,16 +512,20 @@ def plot_annotated_clusters(args, adatas, sample_name="merged", dataset="chicken
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
-def plot_expr_in_ST(args, adatas, gene_name, sample_name = "merged", dataset="chicken", scatter_sz= 6, cm = plt.get_cmap("magma")):
+def plot_expr_in_ST(args, adatas, gene_name, sample_name = "merged", dataset="chicken", scatter_sz= 6., cm = plt.get_cmap("magma")):
     args.spatial = True
     output_dir = f'{args.output_dir}/{dataset}/{sample_name}/expr_in_ST'
     mkdir(output_dir)
     samples = ['D4', 'D7', 'D10', 'D14']
-    fig, axs = figure(1, len(samples), rsz=2.8, csz=4.8, wspace=.5, hspace=.4)
+    fig, axs = figure(2, 2, rsz=2.2, csz=3., wspace=.2, hspace=.2)
     exprs = [np.asarray(adatas[sid][:, adatas[sid].var_names == gene_name].X.todense()).flatten() for sid, sample in enumerate(samples)]
-    box_ratios = [.9, .9, 1., .8]
+    max_exprs = [np.max(expr)for expr in exprs]
+    max_expr = max(max_exprs)
+    box_ratios = [.7, .7, .8, .7]
     for sid, sample in enumerate(samples):
-        ax = axs[sid]
+        row = sid // 2
+        col = sid % 2
+        ax = axs[row][col]
         ax.get_xaxis().set_ticks([])
         ax.get_yaxis().set_ticks([])
         ax.spines['top'].set_visible(False)
@@ -496,17 +535,18 @@ def plot_expr_in_ST(args, adatas, gene_name, sample_name = "merged", dataset="ch
         adata = adatas[sid]
         coord = adata.obsm['spatial'].astype(float)
         x, y = coord[:, 0], coord[:, 1]
-        expr = exprs[sid]
-        st = ax.scatter(x, y, s=scatter_sz, c=expr, cmap=cm)#, vmin=0, vmax=40
+        expr = exprs[sid]/max_expr
+        st = ax.scatter(x, y, s=scatter_sz, c=expr, cmap=cm, vmin=0, vmax=1)#
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * box_ratios[sid], box.height])
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        clb = fig.colorbar(st, cax=cax)
-        clb.ax.set_ylabel("Expr", labelpad=10, rotation=270, fontsize=10, weight='bold')
-        ax.set_title(sample, fontsize=title_sz)
+        if sid == len(samples) - 1:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            clb = fig.colorbar(st, cax=cax)
+            clb.ax.set_ylabel("Expr", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        ax.set_title(sample, fontsize=12)
         if sid == 0:
-            ax.set_ylabel(gene_name, fontsize=title_sz)
+            ax.set_ylabel(gene_name, fontsize=12)
     fig_fp = f"{output_dir}/{gene_name}_ST_expr.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
@@ -827,7 +867,7 @@ def basic_pipeline(args):
         cell_types, region_annos = get_annotations_chicken(args, sample_name)
         adata = load_chicken_data(args, sample_name)
         train_pipeline(args, adata, sample_name, cell_types)
-        # plot_clustering(args, sample_name)
+        plot_clustering(args, sample_name)
         # plot_pseudotime(args, sample_name)
         # plot_phate(args, sample_name, adata_filtered.X, anno_clusters)
         #adata_filtered.obs["bulk_labels"] = pd.Categorical(anno_clusters)
@@ -972,36 +1012,34 @@ def lineage_pipeline(args, all_lineage=False):
         lineage_name = "merged"
         merged_adata, merged_cluster_annotations, merged_cell_types, merged_regions, merged_days = merge_adatas_annotations_chicken(adatas, cluster_annotations, cell_types, regions, days)
     else:
-        lineages = ["Valve cells", "MT-enriched valve cells"]
+        lineages = ["Valve"]
         lineage_name = "_".join(lineages)
         filtered_adatas, filtered_annotations, filtered_cell_types, filtered_regions, filtered_days = filter_adatas_annotations_chicken(adatas, cluster_annotations, cell_types, regions, days, lineages)
         merged_adata, merged_cluster_annotations, merged_cell_types, merged_regions, merged_days = merge_adatas_annotations_chicken(filtered_adatas, filtered_annotations, filtered_cell_types, filtered_regions, filtered_days)
-
+        # plot_lineage_annotated_clusters(args, adatas, filtered_adatas, lineage_name)
     adata_filtered, genes, cells = train_pipeline(args, merged_adata, lineage_name, merged_cell_types, resolution=.4, isTrain=False)
-    # plot_lineage_annotated_clusters(args, adatas, filtered_adatas, lineage_name)
-    #plot_lineage_embedding_tsne(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
+
+    # plot_lineage_expr_tsne(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name, scatter_sz= 1)
+    # plot_lineage_embedding_tsne(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
+    #
     # plot_lineage_expr_umap(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name, scatter_sz= 1)
-    plot_lineage_embedding_umap(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
+    # plot_lineage_embedding_umap(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
+    #
     # plot_lineage_expr_phate(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
-    #plot_lineage_embedding_phate(args, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
-    # pred_clusters = get_clusters(args, lineage_name)
-    #combined_annotations = get_combined_annotations(merged_days, merged_cluster_annotations)
+    # plot_lineage_embedding_phate(args, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
 
-    #plot_lineage_expr_tsne(args, adata_filtered, merged_cell_types, merged_regions, merged_days, combined_merged_annotations, lineage_name, scatter_sz= 1)
-    #method = "combined_merged_cluster"
-    #method = "clustering"
-    #plot_rank_marker_genes_group(args, lineage_name, adata_filtered, combined_merged_annotations, method=method)
+    combined_merged_annotations = get_combined_merged_annotations(merged_days, merged_cluster_annotations)
+    plot_rank_marker_genes_group(args, lineage_name, adata_filtered, combined_merged_annotations, method= "combined_merged_cluster", top_n_genes=5)
 
-    #plot_rank_marker_genes_group(args, lineage_name, merged_adata, merged_days, method="days")
     # plot_phate_pseudotime(args, lineage, merged_adata, merged_days)
     # plot_lineage_pseudotime(args, adatas, cluster_annotations, lineage_name, adata_filtered, merged_days)
 
 def expr_analysis_pipeline(args):
     sample_list = ['D4', 'D7', 'D10', 'D14']
     adatas = [load_chicken_data(args, sample) for sample in sample_list]
-    target_genes = ["CNMD", "BAMBI", "COL1A1", "S100A6", "S100A11", "TXNDC5"]#["ACADSB", "ACBD7", "ACTA2", "ACTG2", "AKR1D1", "APOA1", "APP", "ATP6V1E1", "BAMBI", "BMP10", "BRD2", "C1H2ORF40", "C5H11orf58", "CA9", "CAV3", "CCDC80", "CD36", "CHGB", "CHODL", "CIAO2B", "CNMD", "COL14A1", "COL1A1", "COL4A1", "COL5A1", "COX17", "CPE", "CRIP1", "CSRP2", "CSTA", "CTGF", "CTSA", "DERA", "DPYSL3", "DRAXIN", "EDNRA", "ENSGALG00000004518", "ENSGALG00000013239", "ENSGALG00000015349", "ENSGALG00000020788", "ENSGALG00000028551", "ENSGALG00000040263", "ENSGALG00000050984", "ENSGALG00000053871", "FABP3", "FABP5", "FABP7", "FBLN1", "FGFR3", "FHL1", "FHL2", "FMC1", "FSTL1", "FXYD6", "GJA5", "GKN2", "GLRX5", "GPC1", "GPX3", "HADHB", "HAPLN3", "HBBR-1", "HPGD", "ID2", "ID4", "IRX4", "KRT18", "LBH", "LDHA", "LMOD2", "LSP1", "LTBP2", "LUM", "MAD2L2", "MAPK6", "MAPRE1", "MB"] + ["MFAP2", "MGP", "MOXD1", "MSX1", "MT4L", "MTFP1", "MUSTN1", "MYH1D", "MYH1F", "MYH7", "MYL1", "MYLK", "MYOM1", "MYOM2", "MYOZ2", "NIPSNAP2", "NPC2", "NRN1L", "OSTN", "OXCT1", "PECAM1", "PENK", "PERP2", "PGAP2", "PITX2", "PLN", "POSTN", "PRNP", "PRRX1", "RAMP2", "RARRES1", "RCSD1", "RD3L", "RRAD", "RSRP1", "S100A11", "S100A6", "SEC63", "SERPINE2", "SESTD1", "SFRP1", "SFRP2", "SLN", "SMAD6", "SYPL1", "TBX5", "TESC", "TFPI2", "THBS4", "TIMM9", "TMEM158", "TMEM163", "TNIP1", "TNNC2", "TPM1", "TUBAL3", "TXNDC5", "VCAN", "Wpkci-7"]#"BAMBI"
+    target_genes = ["BAMBI"]#, "CNMD", "COL1A1", "S100A6", "S100A11", "TXNDC5"]#["ACADSB", "ACBD7", "ACTA2", "ACTG2", "AKR1D1", "APOA1", "APP", "ATP6V1E1", "BAMBI", "BMP10", "BRD2", "C1H2ORF40", "C5H11orf58", "CA9", "CAV3", "CCDC80", "CD36", "CHGB", "CHODL", "CIAO2B", "CNMD", "COL14A1", "COL1A1", "COL4A1", "COL5A1", "COX17", "CPE", "CRIP1", "CSRP2", "CSTA", "CTGF", "CTSA", "DERA", "DPYSL3", "DRAXIN", "EDNRA", "ENSGALG00000004518", "ENSGALG00000013239", "ENSGALG00000015349", "ENSGALG00000020788", "ENSGALG00000028551", "ENSGALG00000040263", "ENSGALG00000050984", "ENSGALG00000053871", "FABP3", "FABP5", "FABP7", "FBLN1", "FGFR3", "FHL1", "FHL2", "FMC1", "FSTL1", "FXYD6", "GJA5", "GKN2", "GLRX5", "GPC1", "GPX3", "HADHB", "HAPLN3", "HBBR-1", "HPGD", "ID2", "ID4", "IRX4", "KRT18", "LBH", "LDHA", "LMOD2", "LSP1", "LTBP2", "LUM", "MAD2L2", "MAPK6", "MAPRE1", "MB"] + ["MFAP2", "MGP", "MOXD1", "MSX1", "MT4L", "MTFP1", "MUSTN1", "MYH1D", "MYH1F", "MYH7", "MYL1", "MYLK", "MYOM1", "MYOM2", "MYOZ2", "NIPSNAP2", "NPC2", "NRN1L", "OSTN", "OXCT1", "PECAM1", "PENK", "PERP2", "PGAP2", "PITX2", "PLN", "POSTN", "PRNP", "PRRX1", "RAMP2", "RARRES1", "RCSD1", "RD3L", "RRAD", "RSRP1", "S100A11", "S100A6", "SEC63", "SERPINE2", "SESTD1", "SFRP1", "SFRP2", "SLN", "SMAD6", "SYPL1", "TBX5", "TESC", "TFPI2", "THBS4", "TIMM9", "TMEM158", "TMEM163", "TNIP1", "TNNC2", "TPM1", "TUBAL3", "TXNDC5", "VCAN", "Wpkci-7"]#"BAMBI"
     for gene in target_genes:
-        plot_expr_in_ST(args, adatas, gene)
+        plot_expr_in_ST(args, adatas, gene, scatter_sz=2)
 
 
 
