@@ -895,7 +895,7 @@ def train_pipeline(args, adata, sample_name, cell_types, dataset="chicken", clus
             embedding = train(args, expr, spatial_graph, spatial_dists)
             save_features(args, embedding, dataset, sample_name)
             clustering(args, dataset, sample_name, clustering_method, n_neighbors=n_neighbors, resolution=resolution)
-            # pseudotime(args, dataset, sample_name, root_cell_type="Epi-epithelial cells", cell_types=cell_types, n_neighbors=n_neighbors, resolution=resolution)
+            pseudotime(args, dataset, sample_name, root_cell_type="Epi-epithelial cells", cell_types=cell_types, n_neighbors=n_neighbors, resolution=resolution)
     return adata_filtered, genes, cells
 
 def hiearchical_clustering_heatmap(args, data, lineage_name, annotation_types, annotations_arr, annotation_color_dict_arr, annotation_colors_arr, dataset="chicken"):
