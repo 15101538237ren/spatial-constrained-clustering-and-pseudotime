@@ -3,7 +3,7 @@ import argparse
 parser = argparse.ArgumentParser()
 
 # params to change
-parser.add_argument('--gpu', type=int, default=7)
+parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--arch', type=str, default='DGI')
 parser.add_argument('--spatial', type=bool, default=False)
 parser.add_argument('--n_neighbors_for_knn_graph', type=int, default=5)
@@ -16,7 +16,7 @@ parser.add_argument('--patience', type=int, default=50)
 parser.add_argument('--min_stop', type=int, default=100)
 parser.add_argument('--epochs', type=int, default=1000)
 parser.add_argument('--lr', type=float, default=0.001)
-parser.add_argument('--penalty_scaler', type=float, default=0.01)
+parser.add_argument('--penalty_scaler', type=float, default=0.5)
 parser.add_argument('--dataset_dir', type=str, default='../data')
 parser.add_argument('--output_dir', type=str, default='../output')
 

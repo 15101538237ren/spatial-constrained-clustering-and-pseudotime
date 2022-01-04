@@ -2,10 +2,13 @@
 import os
 import torch
 import gudhi
+import anndata
 import numpy as np
 import scanpy as sc
+import squidpy as sq
 import pandas as pd
 import networkx as nx
+from scipy.sparse import save_npz, load_npz
 from scipy.spatial import distance
 from sklearn.neighbors import kneighbors_graph
 
@@ -48,6 +51,10 @@ def load_DLPFC_data(args, sample_name, v2=True):
         adata = load_ST_file(file_fold=file_fold)
     return adata
 
+def load_slideseqv2_data():
+    adata = sq.datasets.slideseqv2()
+    return adata
+
 def load_chicken_data(args, sample_name):
     file_fold = f'{args.dataset_dir}/Visium/Chicken_Dev/ST/{sample_name}'
     adata = load_ST_file(file_fold=file_fold)
@@ -62,9 +69,26 @@ def load_breast_cancer_data(args, sample_name):
     spots_idx_dicts = {f"{item[0]}x{item[1]}" : idx for idx, item in enumerate(coord_df[["x", "y"]].values.astype(int))}
     spots_selected = np.array([sid for sid, spot in enumerate(list(adata.obs_names)) if spot in spots_idx_dicts]).astype(int)
     adata = adata[spots_selected, :]
+    coord_df = coord_df.iloc[spots_selected, :]
+    spots_idx_dicts = {f"{item[0]}x{item[1]}": idx for idx, item in enumerate(coord_df[["x", "y"]].values.astype(int))}
     coords = coord_df[["pixel_x", "pixel_y"]].values
     adata.obsm["spatial"] = np.array([coords[spots_idx_dicts[spot]] for spot in adata.obs_names])
-    return adata
+    return adata, spots_idx_dicts
+
+def load_preprocessed_data(args, dataset, sample_name):
+    data_root = f'{args.dataset_dir}/{dataset}/{sample_name}/preprocessed'
+    mkdir(data_root)
+    adata = anndata.read_h5ad(f'{data_root}/adata.h5ad')
+    spatial_graph = load_npz(f'{data_root}/spatial_graph.npz')
+    print(f"Readed Preprocessed Data of {dataset}!")
+    return adata, spatial_graph
+
+def save_preprocessed_data(args, dataset, sample_name, adata, spatial_graph):
+    data_root = f'{args.dataset_dir}/{dataset}/{sample_name}/preprocessed'
+    mkdir(data_root)
+    adata.write(f'{data_root}/adata.h5ad')
+    save_npz(f'{data_root}/spatial_graph.npz', spatial_graph)
+    print(f"Saved Preprocessed Data of {dataset}!")
 
 def preprocessing_data(args, adata, n_top_genes=None):
     sc.pp.filter_genes(adata, min_counts=1)  # only consider genes with more than 1 count
@@ -73,18 +97,11 @@ def preprocessing_data(args, adata, n_top_genes=None):
     sc.pp.normalize_per_cell(adata, min_counts=0)  # renormalize after filtering
     sc.pp.log1p(adata)  # log transform: adata.X = log(adata.X + 1)
     sc.pp.pca(adata)  # log transform: adata.X = log(adata.X + 1)
-    print('adata after filtered: (' + str(adata.shape[0]) + ', ' + str(adata.shape[1]) + ')')
-
-    genes = list(adata.var_names)
-    cells = list(adata.obs_names)
     coords = adata.obsm['spatial']
-    expr = adata.X.todense() if type(adata.X).__module__ != np.__name__ else adata.X
-    expr = torch.tensor(expr).float()
     cut = estimate_cutoff_knn(coords, k=args.n_neighbors_for_knn_graph)
     spatial_graph = graph_alpha(coords, cut=cut, n_layer=args.alpha_n_layer)
-    spatial_dists = distance.cdist(coords, coords, 'euclidean')
-    spatial_dists = torch.tensor(spatial_dists / np.max(spatial_dists)).float()
-    return adata, expr, genes, cells, spatial_graph, spatial_dists
+    print('adata after filtered: (' + str(adata.shape[0]) + ', ' + str(adata.shape[1]) + ')')
+    return adata, spatial_graph
 
 def estimate_cutoff_knn(pts, k=10):
     A_knn = kneighbors_graph(pts, n_neighbors=k, mode='distance')

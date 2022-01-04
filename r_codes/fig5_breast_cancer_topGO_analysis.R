@@ -17,8 +17,7 @@ subdir_name = "cluster_specific_marker_genes"
 input_dir_c = c(output_dir, dataset_name, sample_name, method_name, subdir_name)
 input_dir_fp = paste(input_dir_c, collapse = '/')
 gene_back_groud_filename = "background_genes.tsv"
-clusters = c('APC,B,T-1', 'APC,B,T-2', 'Connective', 'Imm&Conn', 'Imm-Reg-1', 'Imm-Reg-2'
-             , 'Interface-1', 'Interface-2', 'Interface-3', 'Invasive')
+clusters = c('Tu.Imm.Itfc-1') #'APC,B,T-1', 'APC,B,T-2', 'Inva-Conn', 'In situ cancer-1', 'In situ cancer-2', 'Tu.Imm.Itfc-1', 'Tu.Imm.Itfc-2', 'Tu.Imm.Itfc-3', 'Invasive-1','Invasive-2'
 
 # Step 1: Preparing the data in the required format
 # Gene universe file
@@ -77,29 +76,26 @@ for (cluster in clusters)
   results.table.p= all_res_final[which(all_res_final$weightFisher<0.005),]
   
   #save first top 50 ontolgies sorted by adjusted pvalues
-  target_file_name = paste(c("topGO_terms.tsv"), collapse = '')
+  target_file_name = paste0(cluster, "_topGO_terms.tsv")
   
   results.table.p$log10WF=-log10(as.numeric(results.table.p$weightFisher))
   
-  # go_term_fp = paste(c(input_dir_fp, target_file_name), collapse = '/')
-  # write.table(results.table.p, go_term_fp,sep="\t",quote=FALSE,row.names=FALSE)
+  go_term_fp = paste(c(input_dir_fp, target_file_name), collapse = '/')
+  write.table(results.table.p, go_term_fp,sep="\t",quote=FALSE,row.names=FALSE)
   
   
   library(ggplot2)
   library(dplyr)
   
-  # results.table.p =read.table(go_term_fp, header=T, sep='\t')
+  results.table.p =read.table(go_term_fp, header=T, sep='\t')
   
   # Reorder following the value of another column:
   results.table.p %>%
     mutate(Term = reorder(Term, log10WF)) %>%
     ggplot( aes(x=Term, y=log10WF,fill = log10WF)) +
-    geom_bar(stat="identity", alpha=.6, width=.4) +
+    geom_bar(stat="identity", alpha=.6, width=.4, fill='#73489D') +
     coord_flip() +
-    scale_fill_gradient(name="-log10(adj.pval)", low="blue", high="red",
-                        limits = c(2.0, 4.0), 
-                        breaks = c(2.1, 3, 3.9),
-                        labels = c(2.0, 3, 4.0)) +
+    
     xlab("") + ylab("-log10(adj.pval)") + theme_bw() + 
     theme(axis.line = element_line(colour = "black"),
           panel.grid.major = element_blank(),
@@ -115,6 +111,6 @@ for (cluster in clusters)
           legend.key.width= unit(.3, 'cm'))
   
   target_fig_name = paste0(cluster, "_topGO.svg")
-  ggsave(paste(c(input_dir_fp, target_fig_name), collapse = '/'), dpi=300) #, width=5.5, height=4
+  ggsave(paste(c(input_dir_fp, target_fig_name), collapse = '/'), dpi=300, width=3.5, height=6) #
 }
 

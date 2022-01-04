@@ -49,7 +49,7 @@ def plot_hne_and_annotation(args, sample_name, dataset="DLPFC", nrow = 1, HnE=Fa
     adata = load_ST_file(data_root)
     coord = adata.obsm['spatial'].astype(float) * scale
     x, y = coord[:, 0], coord[:, 1]
-    anno_clusters = get_annotations(args, sample_name)
+    anno_clusters = get_annotations_dlpfc(args, sample_name)
     img = plt.imread(f"{data_root}/spatial/tissue_lowres_image.png")
     xlimits = [130, 550]
     ylimits = [100, 530]
@@ -249,10 +249,7 @@ def plot_umap_comparison(args, sample_name, dataset="DLPFC", n_neighbors=50):
     data_root = f'{args.dataset_dir}/{dataset}/{sample_name}'
     fig, axs = figure(nrow, ncol, rsz=2.4, csz=2.8, wspace=.3, hspace=.3)
     for ax in axs:
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_xlabel("UMAP 1", fontsize=12, color="black")
-        ax.set_ylabel("UMAP 2", fontsize=12, color="black")
+        ax.axis('off')
 
     for mid, method in enumerate(methods):
         print(f"Processing {sample_name} {method}")
@@ -283,8 +280,12 @@ def plot_umap_comparison(args, sample_name, dataset="DLPFC", n_neighbors=50):
             umap_sub = umap_positions[annotations == cluster]
             color = cm(1. * cid / (len(cluster_names) + 1))
             ax.scatter(umap_sub[:, 0], umap_sub[:, 1], s=2, color=color, label=cluster)
-        if mid == 0:
-            ax.legend(handletextpad=.05, fontsize='x-small')
+        if mid == len(methods) - 1:
+            box = ax.get_position()
+            height_ratio = 1.0
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
+            ax.legend(loc='center left', fontsize='x-small', bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.05,
+                      borderaxespad=.1)
         ax.set_title(method.replace("_", " + "), fontsize=title_sz)
     fig_fp = f"{output_dir}/umap_comparison.pdf"
     plt.savefig(fig_fp, dpi=300)
@@ -318,7 +319,7 @@ def rank_marker_genes_group(args, sample_name, method="leiden", dataset="DLPFC")
     gene_back_ground_fp = f"{output_dir}/gene_back_ground.txt"
     write_list_to_file(gene_back_ground_fp, gene_back_ground)
 
-def plot_marker_gene_expression(args, sample_name, gene_names, dataset="DLPFC", ncol = 4, scale = 0.045):
+def plot_marker_gene_expression(args, sample_name, gene_names, dataset="DLPFC", ncol = 4, scale = 0.045, cm = plt.get_cmap("plasma")):
     original_spatial = args.spatial
     args.spatial = True
     nrow = int(math.ceil(len(gene_names)/float(ncol)))
@@ -329,7 +330,6 @@ def plot_marker_gene_expression(args, sample_name, gene_names, dataset="DLPFC", 
     adata_filtered, _, genes, _, _, _ = preprocessing_data(args, adata)
     expr = np.asarray(adata.X.todense())
     fig, axs = figure(nrow, ncol, rsz=2.5, csz=2.6, wspace=.2, hspace=.2)
-    cm = plt.get_cmap("magma")
     xlimits = [130, 550]
     ylimits = [100, 530]
     for gid, gene in enumerate(gene_names):

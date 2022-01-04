@@ -888,11 +888,11 @@ def annotation_pipeline(args):
     plot_annotated_clusters(args, adatas)
 
 def train_pipeline(args, adata, sample_name, cell_types, dataset="chicken", clustering_method="leiden", resolution = .8, n_neighbors = 10, isTrain=True):
-    adata_filtered, expr, genes, cells, spatial_graph, spatial_dists = preprocessing_data(args, adata)
+    adata_filtered, spatial_graph = preprocessing_data(args, adata)
     if isTrain:
         for spatial in [True]:
             args.spatial = spatial
-            embedding = train(args, expr, spatial_graph, spatial_dists)
+            embedding = train(args, adata_filtered, spatial_graph)
             save_features(args, embedding, dataset, sample_name)
             clustering(args, dataset, sample_name, clustering_method, n_neighbors=n_neighbors, resolution=resolution)
             pseudotime(args, dataset, sample_name, root_cell_type="Epi-epithelial cells", cell_types=cell_types, n_neighbors=n_neighbors, resolution=resolution)
@@ -940,7 +940,7 @@ def heatmap_pipeline(args, all_lineage=True):
         merged_adata, merged_cluster_annotations, merged_cell_types, merged_regions, merged_days = merge_adatas_annotations_chicken(
             filtered_adatas, filtered_annotations, filtered_cell_types, filtered_regions, filtered_days)
     annotation_colors_arr, color_dict_arr = get_annotation_color_arr(args, merged_cluster_annotations, merged_days, merged_regions)
-    adata_filtered, expr, genes, cells, spatial_graph, spatial_dists = preprocessing_data(args, merged_adata, n_top_genes=101)
+    adata_filtered, spatial_graph = preprocessing_data(args, merged_adata, n_top_genes=101)
     expr = adata_filtered.X.todense()
     distances = cdist(expr, expr, 'cosine')
     annotation_types = ["Cluster", "Day", "Region"]
