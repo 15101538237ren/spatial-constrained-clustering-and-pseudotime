@@ -5,11 +5,11 @@ input_dir = "../data/seqfish_mouse/seqfish_mouse/export"
 loom_fp <- paste(c(input_dir, "adata.loom"), collapse = "/")
 loom_obj <- connect(loom_fp,mode = 'r+',skip.validate = T)
 
-seqfish=loom_obj[["matrix"]][,]
+seqfish=t(loom_obj[["matrix"]][,])
 gene=loom_obj$row.attrs$var_names[]
 barcode=loom_obj$col.attrs$obs_names[]
-colnames(seqfish)= gene
-row.names(seqfish)= barcode
+colnames(seqfish)= barcode
+row.names(seqfish)= gene
 seqfish=CreateSeuratObject(counts = seqfish,project = 'seqfish', assay = "Spatial",min.cells = 3, min.features = 0)
 
 seqfish <- SCTransform(seqfish, assay = "Spatial", verbose = F)

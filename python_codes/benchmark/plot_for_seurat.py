@@ -61,7 +61,7 @@ def plot_clustering(args, adata, sample_name, dataset, cm= plt.get_cmap("tab20")
 def plot_pipeline():
     args.dataset_dir = f'../../data'
     args.output_dir = f'../../output'
-    datasets = ["stereo_seq"]#"slideseq_v2", "seqfish_mouse",
+    datasets = ["seqfish_mouse"]#, "stereo_seq""slideseq_v2", 
     for did, dataset in enumerate(datasets):
         print(f'===== Data {dataset} =====')
         data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'

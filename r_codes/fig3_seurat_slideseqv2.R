@@ -4,11 +4,11 @@ input_dir = "../data/slideseq_v2/slideseq_v2/export"
 loom_fp <- paste(c(input_dir, "adata.loom"), collapse = "/")
 loom_obj <- connect(loom_fp,mode = 'r+',skip.validate = T)
 
-slide.seq=loom_obj[["matrix"]][,]
+slide.seq=t(loom_obj[["matrix"]][,])
 gene=loom_obj$row.attrs$var_names[]
 barcode=loom_obj$col.attrs$obs_names[]
-colnames(slide.seq)= gene
-row.names(slide.seq)= barcode
+colnames(slide.seq)= barcode
+row.names(slide.seq)=  gene
 slide.seq=CreateSeuratObject(counts = slide.seq,project = 'slide.seq', assay = "Spatial",min.cells = 3, min.features = 0)
 
 slide.seq <- SCTransform(slide.seq, assay = "Spatial", verbose = F)
