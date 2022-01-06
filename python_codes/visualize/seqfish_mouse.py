@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 import os
+import warnings
 # from python_codes.train.train import train
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
-from python_codes.util.util import load_slideseqv2_data, preprocessing_data, save_preprocessed_data, load_preprocessed_data, save_features
-import warnings
+from python_codes.util.util import load_seqfish_mouse_data, preprocessing_data, save_preprocessed_data, load_preprocessed_data, save_features
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
 warnings.filterwarnings("ignore")
+from scipy.sparse import csr_matrix
 from python_codes.util.util import *
 from matplotlib import rcParams
 rcParams['font.family'] = 'sans-serif'
@@ -38,31 +39,34 @@ def figure(nrow, ncol, rsz=3., csz=3., wspace=.4, hspace=.5):
     plt.subplots_adjust(wspace=wspace, hspace=hspace)
     return fig, axs
 
-def plot_annotation(args, adata, sample_name, nrow = 1, scale = 0.045, ncol=4, rsz=2.5, csz=2.8, wspace=.4, hspace=.5, scatter_sz=1.):
+def plot_annotation(args, adata, nrow = 1, scale = 0.045, ncol=4, rsz=2.5, csz=2.8, wspace=.4, hspace=.5, scatter_sz=1.):
     fig, axs = figure(nrow, ncol, rsz=rsz, csz=csz, wspace=wspace, hspace=hspace)
     if nrow == 1:
         for ax in axs:
             ax.axis('off')
     ax = axs[0]
     x, y = adata.obsm["spatial"][:, 0]*scale, adata.obsm["spatial"][:, 1]*scale
-    annotated_cell_types = adata.obs["cluster"]
+    prefix = "celltype_mapped_refined"
+    annotated_cell_types = adata.obs[prefix]
     cell_type_strs = annotated_cell_types.cat.categories.astype(str)
     cell_type_ints = annotated_cell_types.values.codes
-    cell_type_colors = list(adata.uns['cluster_colors'].astype(str))
-    colors = np.array([cell_type_colors[item] for item in cell_type_ints])
-    for cid in range(len(cell_type_colors)):
+    cell_type_colors = list(adata.uns[f'{prefix}_colors'].astype(str))
+    # colors = np.array([cell_type_colors[item] for item in cell_type_ints])
+    cm = plt.get_cmap("tab20")
+    n_cluster = len(cell_type_colors)
+    for cid in range(n_cluster):
         cit = cell_type_ints == cid
-        ax.scatter(x[cit], y[cit], s=scatter_sz, c=colors[cit], label=cell_type_strs[cid], marker=".")
+        color = cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
+        ax.scatter(x[cit], y[cit], s=scatter_sz, color=color, label=cell_type_strs[cid], marker=".")
     ax.set_facecolor("none")
     ax.set_title("Annotation", fontsize=title_sz)
     xlim, ylim = None, None
     ax.invert_yaxis()
     return fig, axs, x, y, xlim, ylim
 
-
-def plot_clustering(args, adata, sample_name, method="leiden", dataset="slideseq_v2", cm = plt.get_cmap("tab20"), scale = .62, scatter_sz=1., nrow= 1):
+def plot_clustering(args, adata, sample_name, method="leiden", dataset="seqfish_mouse", cm = plt.get_cmap("tab20"), scale = .62, scatter_sz=1., nrow= 1):
     original_spatial = args.spatial
-    fig, axs, x, y, xlim, ylim = plot_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=3, rsz=5, csz=5.5, wspace=.3, hspace=.4)
+    fig, axs, x, y, xlim, ylim = plot_annotation(args, adata, scale=scale, nrow=nrow, ncol=3, rsz=5, csz=5.5, wspace=.3, hspace=.4)
     spatials = [False, True]
     for sid, spatial in enumerate(spatials):
         ax = axs[sid + 1]
@@ -93,9 +97,9 @@ def plot_clustering(args, adata, sample_name, method="leiden", dataset="slideseq
     plt.close('all')
     args.spatial = original_spatial
 
-def plot_pseudotime(args, adata, sample_name, dataset="slideseq_v2", cm = plt.get_cmap("gist_rainbow"), scale = 0.62, scatter_sz=1.3, nrow = 1):
+def plot_pseudotime(args, adata, sample_name, dataset="seqfish_mouse", cm = plt.get_cmap("gist_rainbow"), scale = 0.62, scatter_sz=1.3, nrow = 1):
     original_spatial = args.spatial
-    fig, axs, x, y, _, _ = plot_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=3, rsz=5, csz=5.5, wspace=.3, hspace=.4)
+    fig, axs, x, y, _, _ = plot_annotation(args, adata, scale=scale, nrow=nrow, ncol=3, rsz=5, csz=5.5, wspace=.3, hspace=.4)
     spatials = [False, True]
     for sid, spatial in enumerate(spatials):
         ax = axs[sid + 1]
@@ -122,19 +126,20 @@ def plot_pseudotime(args, adata, sample_name, dataset="slideseq_v2", cm = plt.ge
 ####################################
 
 def export_data_pipeline(args):
-    dataset = "slideseq_v2"
+    dataset = "seqfish_mouse"
     data_root = f'{args.dataset_dir}/{dataset}/{dataset}/export'
     mkdir(data_root)
 
-    adata = load_slideseqv2_data()
+    adata = load_seqfish_mouse_data()
+    adata.X = csr_matrix(adata.X)
     adata.transpose().write(f'{data_root}/adata.h5ad')
 
     locs = pd.DataFrame(adata.obsm["spatial"], columns=["x", "y"])
     locs.to_csv(f"{data_root}/locs.tsv", sep="\t", index=False)
-    print(f'===== Exported {dataset}')
+    print(f'===== Exported {dataset} =====')
 
-def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="slideseq_v2", clustering_method="leiden", resolution=1., n_neighbors=15, isTrain=True):
-    for spatial in [False, True]:#
+def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="seqfish_mouse", clustering_method="leiden", resolution=.3, n_neighbors=15, isTrain=True):
+    for spatial in [False, True]:
         args.spatial = spatial
         if isTrain:
             embedding = train(args, adata_filtered, spatial_graph)
@@ -144,22 +149,17 @@ def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="sl
                    resolution=resolution)
 
 def basic_pipeline(args):
-    dataset = "slideseq_v2"
-    clustering_method = "leiden"
-    sample_list = ['slideseq_v2']
+    dataset = "seqfish_mouse"
 
-    for sample_idx, sample_name in enumerate(sample_list):
-        print(f'===== Data {sample_idx + 1} : {sample_name}')
-        data_root = f'{args.dataset_dir}/{dataset}/{sample_name}/preprocessed'
-        if os.path.exists(f"{data_root}/adata.h5ad"):
-            adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, sample_name)
-        else:
-            adata = load_slideseqv2_data()
-            adata_filtered, spatial_graph = preprocessing_data(args, adata)
-            save_preprocessed_data(args, dataset, sample_name, adata, spatial_graph)
+    print(f'===== Data: {dataset} =====')
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
+    if os.path.exists(f"{data_root}/adata.h5ad"):
+        adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
+    else:
+        adata = load_seqfish_mouse_data()
+        adata_filtered, spatial_graph = preprocessing_data(args, adata)
+        save_preprocessed_data(args, dataset, dataset, adata, spatial_graph)
 
-        # train_pipeline(args, adata_filtered, spatial_graph, sample_name, n_neighbors=8, isTrain=False)
-        # plot_clustering(args, adata_filtered, sample_name, scatter_sz=1.5, scale=1, method=clustering_method)
-        # plot_pseudotime(args, adata_filtered, sample_name, scatter_sz=1.5, scale=1)
-        # plot_rank_marker_genes_group(args, sample_name, adata_filtered, top_n_genes=5)
-        # get_correlation_matrix_btw_clusters(args, sample_name, adata_filtered)
+    train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=30, isTrain=False)
+    # plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
+    plot_pseudotime(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)

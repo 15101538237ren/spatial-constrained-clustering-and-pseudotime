@@ -21,10 +21,10 @@ def pseudotime(args, dataset, sample_name, n_neighbors=20, root_cell_type = None
         sc.tl.leiden(adata, resolution=resolution)
         sc.tl.paga(adata)
         indices = np.arange(adata.shape[0])
-        selected_ind = np.random.choice(indices, 1000, False)
+        selected_ind = np.random.choice(indices, 5000, False)
         sub_adata_x = adata.X[selected_ind, :]
         sum_dists = distance_matrix(sub_adata_x, sub_adata_x).sum(axis=1)
-        adata.uns['iroot'] = np.argmax(sum_dists)
+        adata.uns['iroot'] = np.argmax(-sum_dists)
         if root_cell_type:
             descend_dist_inds = sorted(range(len(sum_dists)), key=lambda k:sum_dists[k], reverse=True)
             for root_idx in descend_dist_inds:

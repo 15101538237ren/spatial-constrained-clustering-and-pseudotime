@@ -55,6 +55,18 @@ def load_slideseqv2_data():
     adata = sq.datasets.slideseqv2()
     return adata
 
+def load_seqfish_mouse_data():
+    adata = sq.datasets.seqfish()
+    return adata
+
+def load_stereo_seq_data(args):
+    file_fold = f'{args.dataset_dir}/stereo_seq'
+    adata = sc.read_csv(f"{file_fold}/RNA_counts.tsv", delimiter='\t', first_column_names=True)
+    coords = pd.read_csv(f"{file_fold}/position.tsv", delimiter='\t').values.astype(float)
+    adata = adata.transpose()
+    adata.obsm["spatial"] = coords[:, :2]
+    return adata
+
 def load_chicken_data(args, sample_name):
     file_fold = f'{args.dataset_dir}/Visium/Chicken_Dev/ST/{sample_name}'
     adata = load_ST_file(file_fold=file_fold)
@@ -75,19 +87,21 @@ def load_breast_cancer_data(args, sample_name):
     adata.obsm["spatial"] = np.array([coords[spots_idx_dicts[spot]] for spot in adata.obs_names])
     return adata, spots_idx_dicts
 
-def load_preprocessed_data(args, dataset, sample_name):
+def load_preprocessed_data(args, dataset, sample_name, sedr=False):
     data_root = f'{args.dataset_dir}/{dataset}/{sample_name}/preprocessed'
     mkdir(data_root)
-    adata = anndata.read_h5ad(f'{data_root}/adata.h5ad')
-    spatial_graph = load_npz(f'{data_root}/spatial_graph.npz')
+    suffix = "-sedr" if sedr else ""
+    adata = anndata.read_h5ad(f'{data_root}/adata{suffix}.h5ad')
+    spatial_graph = load_npz(f'{data_root}/spatial_graph{suffix}.npz')
     print(f"Readed Preprocessed Data of {dataset}!")
     return adata, spatial_graph
 
-def save_preprocessed_data(args, dataset, sample_name, adata, spatial_graph):
+def save_preprocessed_data(args, dataset, sample_name, adata, spatial_graph, sedr=False):
     data_root = f'{args.dataset_dir}/{dataset}/{sample_name}/preprocessed'
     mkdir(data_root)
-    adata.write(f'{data_root}/adata.h5ad')
-    save_npz(f'{data_root}/spatial_graph.npz', spatial_graph)
+    suffix = "-sedr" if sedr else ""
+    adata.write(f'{data_root}/adata{suffix}.h5ad')
+    save_npz(f'{data_root}/spatial_graph{suffix}.npz', spatial_graph)
     print(f"Saved Preprocessed Data of {dataset}!")
 
 def preprocessing_data(args, adata, n_top_genes=None):
