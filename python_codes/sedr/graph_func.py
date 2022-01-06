@@ -71,10 +71,9 @@ def sparse_mx_to_torch_edge_list(sparse_mx):
     edge_list = np.vstack((sparse_mx.row, sparse_mx.col))
     return edge_list
 
-def graph_construction(sp_graph, cell_N, params):
-    # adata_Adj = graph_computing(adj_coo, cell_N, params)
-    edge_list = sparse_mx_to_torch_edge_list(sp_graph)
-    graphdict = edgeList2edgeDict(edge_list, cell_N)
+def graph_construction(adj_coo, cell_N, params):
+    adata_Adj = graph_computing(adj_coo, cell_N, params)
+    graphdict = edgeList2edgeDict(adata_Adj, cell_N)
     adj_org = nx.adjacency_matrix(nx.from_dict_of_lists(graphdict))
 
     # Store original adjacency matrix (without diagonal entries) for later

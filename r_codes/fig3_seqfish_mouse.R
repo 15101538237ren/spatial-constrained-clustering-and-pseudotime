@@ -1,19 +1,24 @@
 library(Seurat)
-library(SeuratDisk)
+library(loomR)
 
 input_dir = "../data/seqfish_mouse/seqfish_mouse/export"
-h5ad_fp = paste(c(input_dir, "adata.h5ad"), collapse = "/")
-h5seurat_fp = paste(c(input_dir, "adata.h5seurat"), collapse = "/")
+loom_fp <- paste(c(input_dir, "adata.loom"), collapse = "/")
+loom_obj <- connect(loom_fp,mode = 'r+',skip.validate = T)
 
-Convert(h5ad_fp, dest = "h5seurat", assay = "Spatial", overwrite = T)
-seqfish <- LoadH5Seurat(h5seurat_fp)
+seqfish=loom_obj[["matrix"]][,]
+gene=loom_obj$row.attrs$var_names[]
+barcode=loom_obj$col.attrs$obs_names[]
+colnames(seqfish)= gene
+row.names(seqfish)= barcode
+seqfish=CreateSeuratObject(counts = seqfish,project = 'seqfish', assay = "Spatial",min.cells = 3, min.features = 0)
+
 seqfish <- SCTransform(seqfish, assay = "Spatial", verbose = F)
 seqfish <- RunPCA(seqfish, assay = "SCT", verbose = F)
 seqfish <- RunUMAP(seqfish, reduction = "pca", dims = 1:50)
 seqfish <- FindNeighbors(seqfish, reduction = "pca", dims = 1:50)
-seqfish <- FindClusters(seqfish, resolution = 0.5, verbose = F)
+seqfish <- FindClusters(seqfish, resolution = 1.0, verbose = F)
 
-dir.output <- "../output/seqfish_mouse/seqfish_mouse/DGI_SP/Seurat"
+dir.output <- "../output/seqfish_mouse/seqfish_mouse/Seurat"
 dir.create(dir.output, showWarnings = F)
 
 write.table(seqfish@reductions$pca@cell.embeddings, file = file.path(dir.output, 'seurat.PCs.tsv'), sep='\t', quote=F)

@@ -16,6 +16,7 @@ rcParams['font.sans-serif'] = ['Arial','Roboto']
 rcParams['savefig.dpi'] = 300
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable, inset_locator
+from python_codes.util.exchangeable_loom import write_exchangeable_loom
 title_sz = 16
 
 ####################################
@@ -131,8 +132,7 @@ def export_data_pipeline(args):
     mkdir(data_root)
 
     adata = load_seqfish_mouse_data()
-    adata.X = csr_matrix(adata.X)
-    adata.transpose().write(f'{data_root}/adata.h5ad')
+    write_exchangeable_loom(adata,f'{data_root}/adata.loom')
 
     locs = pd.DataFrame(adata.obsm["spatial"], columns=["x", "y"])
     locs.to_csv(f"{data_root}/locs.tsv", sep="\t", index=False)

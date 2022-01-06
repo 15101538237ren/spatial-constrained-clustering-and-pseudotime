@@ -5,6 +5,7 @@ from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
 from python_codes.util.util import load_slideseqv2_data, preprocessing_data, save_preprocessed_data, load_preprocessed_data, save_features
 import warnings
+from scipy.sparse import csr_matrix
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
 warnings.filterwarnings("ignore")
@@ -15,6 +16,7 @@ rcParams['font.sans-serif'] = ['Arial','Roboto']
 rcParams['savefig.dpi'] = 300
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable, inset_locator
+from python_codes.util.exchangeable_loom import write_exchangeable_loom
 title_sz = 16
 
 ####################################
@@ -60,7 +62,7 @@ def plot_annotation(args, adata, sample_name, nrow = 1, scale = 0.045, ncol=4, r
     return fig, axs, x, y, xlim, ylim
 
 
-def plot_clustering(args, adata, sample_name, method="leiden", dataset="slideseq_v2", cm = plt.get_cmap("tab20"), scale = .62, scatter_sz=1., nrow= 1):
+def plot_clustering(args, adata, sample_name, method="leiden", dataset="slideseq_v2", cm = plt.get_cmap("tab20"), scale=.62, scatter_sz=1., nrow= 1):
     original_spatial = args.spatial
     fig, axs, x, y, xlim, ylim = plot_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=3, rsz=5, csz=5.5, wspace=.3, hspace=.4)
     spatials = [False, True]
@@ -116,7 +118,6 @@ def plot_pseudotime(args, adata, sample_name, dataset="slideseq_v2", cm = plt.ge
     plt.close('all')
     args.spatial = original_spatial
 
-
 ####################################
 #-------------Pipelines------------#
 ####################################
@@ -127,7 +128,7 @@ def export_data_pipeline(args):
     mkdir(data_root)
 
     adata = load_slideseqv2_data()
-    adata.transpose().write(f'{data_root}/adata.h5ad')
+    write_exchangeable_loom(adata,f'{data_root}/adata.loom')
 
     locs = pd.DataFrame(adata.obsm["spatial"], columns=["x", "y"])
     locs.to_csv(f"{data_root}/locs.tsv", sep="\t", index=False)

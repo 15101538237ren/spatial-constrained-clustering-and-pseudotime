@@ -67,6 +67,14 @@ def load_stereo_seq_data(args):
     adata.obsm["spatial"] = coords[:, :2]
     return adata
 
+def load_datasets(args, dataset):
+    if dataset == "slideseq_v2":
+        return load_slideseqv2_data()
+    elif dataset == "seqfish_mouse":
+        return load_seqfish_mouse_data()
+    else:
+        return load_stereo_seq_data(args)
+
 def load_chicken_data(args, sample_name):
     file_fold = f'{args.dataset_dir}/Visium/Chicken_Dev/ST/{sample_name}'
     adata = load_ST_file(file_fold=file_fold)
@@ -111,6 +119,17 @@ def preprocessing_data(args, adata, n_top_genes=None):
     sc.pp.normalize_per_cell(adata, min_counts=0)  # renormalize after filtering
     sc.pp.log1p(adata)  # log transform: adata.X = log(adata.X + 1)
     sc.pp.pca(adata)  # log transform: adata.X = log(adata.X + 1)
+    coords = adata.obsm['spatial']
+    cut = estimate_cutoff_knn(coords, k=args.n_neighbors_for_knn_graph)
+    spatial_graph = graph_alpha(coords, cut=cut, n_layer=args.alpha_n_layer)
+    print('adata after filtered: (' + str(adata.shape[0]) + ', ' + str(adata.shape[1]) + ')')
+    return adata, spatial_graph
+
+def preprocessing_data_sedr(args, adata, min_cells=3, pca_n_comps=300):
+    sc.pp.filter_genes(adata, min_cells=min_cells)
+    sc.pp.normalize_total(adata, target_sum=1, exclude_highly_expressed=True)
+    sc.pp.scale(adata)
+    sc.pp.pca(adata, n_comps=pca_n_comps)
     coords = adata.obsm['spatial']
     cut = estimate_cutoff_knn(coords, k=args.n_neighbors_for_knn_graph)
     spatial_graph = graph_alpha(coords, cut=cut, n_layer=args.alpha_n_layer)
