@@ -63,7 +63,7 @@ def load_stereo_seq_data(args):
     file_fold = f'{args.dataset_dir}/stereo_seq'
     adata = sc.read_csv(f"{file_fold}/RNA_counts.tsv", delimiter='\t', first_column_names=True)
     coords = pd.read_csv(f"{file_fold}/position.tsv", delimiter='\t').values.astype(float)
-    adata = adata.transpose()
+    adata = adata.transpose()[:, 1:]
     adata.obsm["spatial"] = coords[:, :2]
     return adata
 

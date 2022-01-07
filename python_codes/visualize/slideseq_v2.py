@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os
+import os, math, shutil
 # from python_codes.train.train import train
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
@@ -18,6 +18,18 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable, inset_locator
 from python_codes.util.exchangeable_loom import write_exchangeable_loom
 title_sz = 16
+
+####################################
+#----------Get Annotations---------#
+####################################
+
+def get_clusters(args, dataset, sample_name, method="leiden"):
+    original_spatial = args.spatial
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    pred_clusters = pd.read_csv(f"{output_dir}/{method}.tsv", header=None).values.flatten().astype(str)
+    args.spatial = original_spatial
+    return pred_clusters
 
 ####################################
 #-------------Plotting-------------#
@@ -39,6 +51,19 @@ def figure(nrow, ncol, rsz=3., csz=3., wspace=.4, hspace=.5):
     plt_setting()
     plt.subplots_adjust(wspace=wspace, hspace=hspace)
     return fig, axs
+
+def set_ax_for_expr_plotting(ax):
+    ax.get_xaxis().set_ticks([])
+    ax.get_yaxis().set_ticks([])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * .9, box.height])
+
+    ax.invert_yaxis()
+    return ax
 
 def plot_annotation(args, adata, sample_name, nrow = 1, scale = 0.045, ncol=4, rsz=2.5, csz=2.8, wspace=.4, hspace=.5, scatter_sz=1.):
     fig, axs = figure(nrow, ncol, rsz=rsz, csz=csz, wspace=wspace, hspace=hspace)
@@ -118,6 +143,71 @@ def plot_pseudotime(args, adata, sample_name, dataset="slideseq_v2", cm = plt.ge
     plt.close('all')
     args.spatial = original_spatial
 
+def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm = plt.get_cmap("RdPu"), n_cols = 3, max_expr_threshold=.0):
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    mkdir(output_dir)
+    n_genes = len(genes)
+    n_rows = int(math.ceil(n_genes/n_cols))
+    fig, axs = figure(n_rows, n_cols, rsz=7.5, csz=8, wspace=.3, hspace=.4)
+    exprs = np.array(adata.X.todense()).astype(float)
+    all_genes = np.array(adata.var_names)
+
+    x, y = adata.obsm["spatial"][:, 0], adata.obsm["spatial"][:, 1]
+    for gid, gene in enumerate(genes):
+        row = gid // n_cols
+        col = gid % n_cols
+        ax = axs[row][col] if n_rows > 1 else axs[col]
+        expr = exprs[:, all_genes == gene].flatten()
+        expr = (expr - expr.mean())/expr.std()
+        ax = set_ax_for_expr_plotting(ax)
+        st = ax.scatter(x, y, s=scatter_sz, c=expr, cmap=cm, vmin=0, vmax=6)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        clb = fig.colorbar(st, cax=cax)
+        clb.ax.set_ylabel("Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        ax.set_title(gene, fontsize=12)
+    fig_fp = f"{output_dir}/ST_expression.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, method="cluster", top_n_genes=3):
+    original_spatial = args.spatial
+    args.spatial = True
+    pred_clusters = get_clusters(args, dataset, sample_name)
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    adata_filtered.obs[method] = pd.Categorical(pred_clusters)
+    sc.tl.rank_genes_groups(adata_filtered, method, method='wilcoxon')
+    # sc.pl.rank_genes_groups(adata_filtered, n_genes=25, ncols=5, fontsize=10, sharey=False, save=f"{sample_name}_ranks_gby_{method}.pdf")
+    # sc.pl.rank_genes_groups_heatmap(adata_filtered, n_genes=top_n_genes, standard_scale='var',  show_gene_labels=True, save=f"{sample_name}_heatmap_gby_{method}.pdf")
+    sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=top_n_genes, standard_scale='var', cmap='bwr', save=f"{sample_name}_mean_expr_gby_{method}.pdf")
+    # sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=top_n_genes, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save=f"{sample_name}_dot_lfc_gby_{method}.pdf")
+    # sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=top_n_genes, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save=f"{sample_name}_matrix_lfc_gby_{method}.pdf")
+    # sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=top_n_genes, cmap='bwr', colorbar_title='Mean Expr.', save=f"{sample_name}_matrix_mean_expr_gby_{method}.pdf")
+
+    files = [
+             # f"rank_genes_groups_cluster{sample_name}_ranks_gby_{method}.pdf",
+             # f"heatmap{sample_name}_heatmap_gby_{method}.pdf",
+             f"dotplot_{sample_name}_mean_expr_gby_{method}.pdf"#,
+             # f"dotplot_{sample_name}_dot_lfc_gby_{method}.pdf",
+             # f"matrixplot_{sample_name}_matrix_lfc_gby_{method}.pdf",
+             # f"matrixplot_{sample_name}_matrix_mean_expr_gby_{method}.pdf"
+    ]
+
+    for file in files:
+        src_fp = f"./figures/{file}"
+        target_fp = f"{output_dir}/{file}"
+        shutil.move(src_fp, target_fp)
+    args.spatial = original_spatial
+    cluster_marker_genes_fp = f'{output_dir}/marker_genes_pval_gby_{method}.tsv'
+    mkdir(os.path.dirname(cluster_marker_genes_fp))
+    result = adata_filtered.uns['rank_genes_groups']
+    groups = result['names'].dtype.names
+    df = pd.DataFrame(
+        {group + '_' + key[:1]: result[key][group]
+        for group in groups for key in ['names', 'pvals']})
+    df.to_csv(cluster_marker_genes_fp, sep="\t", index=False)
+
+
 ####################################
 #-------------Pipelines------------#
 ####################################
@@ -160,7 +250,29 @@ def basic_pipeline(args):
             save_preprocessed_data(args, dataset, sample_name, adata, spatial_graph)
 
         # train_pipeline(args, adata_filtered, spatial_graph, sample_name, n_neighbors=8, isTrain=False)
-        # plot_clustering(args, adata_filtered, sample_name, scatter_sz=1.5, scale=1, method=clustering_method)
+        plot_clustering(args, adata_filtered, sample_name, scatter_sz=1.5, scale=1, method=clustering_method)
         # plot_pseudotime(args, adata_filtered, sample_name, scatter_sz=1.5, scale=1)
         # plot_rank_marker_genes_group(args, sample_name, adata_filtered, top_n_genes=5)
         # get_correlation_matrix_btw_clusters(args, sample_name, adata_filtered)
+
+
+def expr_analysis_pipeline(args):
+    dataset = "slideseq_v2"
+    genes = ["Atp2b1", "Chgb", "Ncdn", "Mbp", "Necab2", "Enpp2", "Pcp4", "Lrrtm4", "Ptgds"]
+    print(f'===== Data: {dataset} =====')
+    adata = load_slideseqv2_data()
+    plot_expr_in_ST(args, adata, genes, dataset, dataset, scatter_sz=1)
+
+def marker_gene_pipeline(args):
+    dataset = "slideseq_v2"
+
+    print(f'===== Data: {dataset} =====')
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
+    if os.path.exists(f"{data_root}/adata.h5ad"):
+        adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
+    else:
+        adata = load_slideseqv2_data()
+        adata_filtered, spatial_graph = preprocessing_data(args, adata)
+        save_preprocessed_data(args, dataset, dataset, adata, spatial_graph)
+    adata_filtered.var_names = np.char.upper(np.array(adata_filtered.var_names).astype(str))
+    plot_rank_marker_genes_group(args, dataset, dataset, adata_filtered, top_n_genes=5)
