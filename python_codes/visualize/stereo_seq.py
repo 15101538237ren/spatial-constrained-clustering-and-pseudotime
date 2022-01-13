@@ -44,10 +44,10 @@ def plt_setting():
     plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-def figure(nrow, ncol, rsz=3., csz=3., wspace=.4, hspace=.5):
+def figure(nrow, ncol, rsz=3., csz=3., wspace=.4, hspace=.5, left=None, right=None):
     fig, axs = plt.subplots(nrow, ncol, figsize=(ncol * csz, nrow * rsz))
     plt_setting()
-    plt.subplots_adjust(wspace=wspace, hspace=hspace)
+    plt.subplots_adjust(wspace=wspace, hspace=hspace, left=left, right=right)
     return fig, axs
 
 def set_ax_for_expr_plotting(ax):
@@ -63,8 +63,8 @@ def set_ax_for_expr_plotting(ax):
     ax.invert_yaxis()
     return ax
 
-def plot_annotation(args, adata, nrow = 1, scale = 0.045, ncol=4, rsz=2.5, csz=2.8, wspace=.4, hspace=.5, scatter_sz=1.):
-    fig, axs = figure(nrow, ncol, rsz=rsz, csz=csz, wspace=wspace, hspace=hspace)
+def plot_annotation(args, adata, nrow = 1, scale = 0.045, ncol=4, rsz=2.5, csz=2.8, wspace=.4, hspace=.5, scatter_sz=1., left=None, right=None):
+    fig, axs = figure(nrow, ncol, rsz=rsz, csz=csz, wspace=wspace, hspace=hspace, left=left, right=right)
     if nrow == 1:
         for ax in axs:
             ax.axis('off')
@@ -74,7 +74,7 @@ def plot_annotation(args, adata, nrow = 1, scale = 0.045, ncol=4, rsz=2.5, csz=2
 
 def plot_clustering(args, adata, sample_name, method="leiden", dataset="stereo_seq", cm = plt.get_cmap("tab20"), scale = .62, scatter_sz=1., nrow= 1):
     original_spatial = args.spatial
-    fig, axs, x, y, xlim, ylim = plot_annotation(args, adata, scale=scale, nrow=nrow, ncol=2, rsz=5, csz=5.5, wspace=.3, hspace=.4)
+    fig, axs, x, y, xlim, ylim = plot_annotation(args, adata, scale=scale, nrow=nrow, ncol=2, rsz=5, csz=6, wspace=.1, hspace=.1, left=.1, right=.95)
     spatials = [False, True]
     for sid, spatial in enumerate(spatials):
         ax = axs[sid]
@@ -86,10 +86,10 @@ def plot_clustering(args, adata, sample_name, method="leiden", dataset="stereo_s
         for cid, cluster in enumerate(uniq_pred):
             color = cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
             ind = pred_clusters == cluster
-            ax.scatter(x[ind], y[ind], s=scatter_sz, color=color, label=cluster, marker=".")
+            ax.scatter(-y[ind], x[ind], s=scatter_sz, color=color, label=cluster, marker=".")
         ax.set_facecolor("none")
-        title = args.arch if not spatial else "%s + SP" % args.arch
-        ax.set_title(title, fontsize=title_sz, pad=-30)
+        # title = args.arch if not spatial else "%s + SP" % args.arch
+        # ax.set_title(title, fontsize=title_sz, pad=-30)
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
         ax.invert_yaxis()
@@ -128,13 +128,13 @@ def plot_pseudotime(args, adata, sample_name, dataset="stereo_seq", cm = plt.get
     plt.close('all')
     args.spatial = original_spatial
 
-def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm = plt.get_cmap("RdPu"), n_cols = 3, max_expr_threshold=.0):
+def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm = plt.get_cmap("RdPu"), n_cols = 4, max_expr_threshold=.0):
     args.spatial = True
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     mkdir(output_dir)
     n_genes = len(genes)
     n_rows = int(math.ceil(n_genes/n_cols))
-    fig, axs = figure(n_rows, n_cols, rsz=7.5, csz=8.0, wspace=.3, hspace=.4)
+    fig, axs = figure(n_rows, n_cols, rsz=5.5, csz=6., wspace=.1, hspace=.1, left=.05, right=.95)
     exprs = adata.X
     all_genes = np.char.upper(np.array(list(adata.var_names)))
 
@@ -146,13 +146,14 @@ def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm
         expr = exprs[:, all_genes == gene]
         expr = (expr - expr.mean())/expr.std()
         ax = set_ax_for_expr_plotting(ax)
-        st = ax.scatter(x, y, s=scatter_sz, c=expr, cmap=cm, vmin=0, vmax=6)
+        st = ax.scatter(-y, x, s=scatter_sz, c=expr, cmap=cm, vmin=0, vmax=4)
         ax.invert_yaxis()
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        clb = fig.colorbar(st, cax=cax)
-        clb.ax.set_ylabel("Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
-        ax.set_title(gene, fontsize=12)
+        # if gid == len(genes) - 1:
+        #     divider = make_axes_locatable(ax)
+        #     cax = divider.append_axes("right", size="5%", pad=0.05)
+        #     clb = fig.colorbar(st, cax=cax)
+        #     clb.ax.set_ylabel("Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        ax.set_title(gene, fontsize=30)
     fig_fp = f"{output_dir}/ST_expression.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
@@ -192,7 +193,6 @@ def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, met
         for group in groups for key in ['names', 'pvals']})
     df.to_csv(cluster_marker_genes_fp, sep="\t", index=False)
 
-
 ####################################
 #-------------Pipelines------------#
 ####################################
@@ -229,18 +229,26 @@ def basic_pipeline(args):
     else:
         adata = load_stereo_seq_data(args)
         adata_filtered, spatial_graph = preprocessing_data(args, adata)
-        save_preprocessed_data(args, dataset, dataset, adata, spatial_graph)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
 
     #train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=15, isTrain=False)
-    plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
+    plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1.5)
     #plot_pseudotime(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
 
 def expr_analysis_pipeline(args):
     dataset = "stereo_seq"
-    genes = ["SCG2", "SPARCL1", "MBP", "GABRA1", "PCP4", "NRGN"]
+    genes = ["GABRA1", "SCG2", "NRGN", "CAMK2N1", "PTN", "APOD", "MEIS2", "PCP4"] #
     print(f'===== Data: {dataset} =====')
-    adata = load_stereo_seq_data(args)
-    plot_expr_in_ST(args, adata, genes, dataset, dataset, scatter_sz=1)
+
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/export'
+    mkdir(data_root)
+    adata_fp = f'{data_root}/adata.h5ad'
+    if os.path.exists(adata_fp):
+        adata = sc.read_h5ad(adata_fp)
+    else:
+        adata = load_stereo_seq_data(args)
+    print(f'===== Readed Data: {dataset} =====')
+    plot_expr_in_ST(args, adata, genes, dataset, dataset, scatter_sz=2.)
 
 def marker_gene_pipeline(args):
     dataset = "stereo_seq"
@@ -252,6 +260,6 @@ def marker_gene_pipeline(args):
     else:
         adata = load_stereo_seq_data(args)
         adata_filtered, spatial_graph = preprocessing_data(args, adata)
-        save_preprocessed_data(args, dataset, dataset, adata, spatial_graph)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
     adata_filtered.var_names = np.char.upper(np.array(adata_filtered.var_names).astype(str))
     plot_rank_marker_genes_group(args, dataset, dataset, adata_filtered, top_n_genes=5)

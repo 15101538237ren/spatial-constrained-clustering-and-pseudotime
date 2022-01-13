@@ -46,10 +46,10 @@ def plt_setting():
     plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-def figure(nrow, ncol, rsz=3., csz=3., wspace=.4, hspace=.5):
+def figure(nrow, ncol, rsz=3., csz=3., wspace=.4, hspace=.5, left=None, right=None):
     fig, axs = plt.subplots(nrow, ncol, figsize=(ncol * csz, nrow * rsz))
     plt_setting()
-    plt.subplots_adjust(wspace=wspace, hspace=hspace)
+    plt.subplots_adjust(wspace=wspace, hspace=hspace, left=left, right=right)
     return fig, axs
 
 def set_ax_for_expr_plotting(ax):
@@ -143,13 +143,13 @@ def plot_pseudotime(args, adata, sample_name, dataset="slideseq_v2", cm = plt.ge
     plt.close('all')
     args.spatial = original_spatial
 
-def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm = plt.get_cmap("RdPu"), n_cols = 3, max_expr_threshold=.0):
+def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm = plt.get_cmap("RdPu"), n_cols = 4, max_expr_threshold=.0):
     args.spatial = True
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     mkdir(output_dir)
     n_genes = len(genes)
     n_rows = int(math.ceil(n_genes/n_cols))
-    fig, axs = figure(n_rows, n_cols, rsz=7.5, csz=8, wspace=.3, hspace=.4)
+    fig, axs = figure(n_rows, n_cols, rsz=5.5, csz=5.2, wspace=.1, hspace=.3, left=.05, right=.95)
     exprs = np.array(adata.X.todense()).astype(float)
     all_genes = np.array(adata.var_names)
 
@@ -158,18 +158,20 @@ def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm
         row = gid // n_cols
         col = gid % n_cols
         ax = axs[row][col] if n_rows > 1 else axs[col]
-        expr = exprs[:, all_genes == gene].flatten()
+        expr = exprs[:, all_genes == gene]
         expr = (expr - expr.mean())/expr.std()
         ax = set_ax_for_expr_plotting(ax)
         st = ax.scatter(x, y, s=scatter_sz, c=expr, cmap=cm, vmin=0, vmax=6)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        clb = fig.colorbar(st, cax=cax)
-        clb.ax.set_ylabel("Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
-        ax.set_title(gene, fontsize=12)
+        # if gid == len(genes) - 1:
+        #     divider = make_axes_locatable(ax)
+        #     cax = divider.append_axes("right", size="5%", pad=0.05)
+        #     clb = fig.colorbar(st, cax=cax)
+        #     clb.ax.set_ylabel("Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        ax.set_title(gene, fontsize=30, pad=10)
     fig_fp = f"{output_dir}/ST_expression.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
+
 def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, method="cluster", top_n_genes=3):
     original_spatial = args.spatial
     args.spatial = True
@@ -187,9 +189,9 @@ def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, met
     files = [
              # f"rank_genes_groups_cluster{sample_name}_ranks_gby_{method}.pdf",
              # f"heatmap{sample_name}_heatmap_gby_{method}.pdf",
-             f"dotplot_{sample_name}_mean_expr_gby_{method}.pdf"#,
+             f"dotplot_{sample_name}_mean_expr_gby_{method}.pdf",
              # f"dotplot_{sample_name}_dot_lfc_gby_{method}.pdf",
-             # f"matrixplot_{sample_name}_matrix_lfc_gby_{method}.pdf",
+             # f"matrixplot_{sample_name}_matrix_lfc_gby_{method}.pdf"#,
              # f"matrixplot_{sample_name}_matrix_mean_expr_gby_{method}.pdf"
     ]
 
@@ -247,7 +249,7 @@ def basic_pipeline(args):
         else:
             adata = load_slideseqv2_data()
             adata_filtered, spatial_graph = preprocessing_data(args, adata)
-            save_preprocessed_data(args, dataset, sample_name, adata, spatial_graph)
+            save_preprocessed_data(args, dataset, sample_name, adata_filtered, spatial_graph)
 
         # train_pipeline(args, adata_filtered, spatial_graph, sample_name, n_neighbors=8, isTrain=False)
         plot_clustering(args, adata_filtered, sample_name, scatter_sz=1.5, scale=1, method=clustering_method)
@@ -258,10 +260,10 @@ def basic_pipeline(args):
 
 def expr_analysis_pipeline(args):
     dataset = "slideseq_v2"
-    genes = ["Atp2b1", "Chgb", "Ncdn", "Mbp", "Necab2", "Enpp2", "Pcp4", "Lrrtm4", "Ptgds"]
+    genes = ["Atp2b1", "Chgb", "Lrrtm4", "Enpp2", "Mbp", "Pcp4", "Ptgds", "Meg3"]#, "Necab2", "Ncdn"
     print(f'===== Data: {dataset} =====')
     adata = load_slideseqv2_data()
-    plot_expr_in_ST(args, adata, genes, dataset, dataset, scatter_sz=1)
+    plot_expr_in_ST(args, adata, genes, dataset, dataset, scatter_sz=2.)
 
 def marker_gene_pipeline(args):
     dataset = "slideseq_v2"
@@ -273,6 +275,6 @@ def marker_gene_pipeline(args):
     else:
         adata = load_slideseqv2_data()
         adata_filtered, spatial_graph = preprocessing_data(args, adata)
-        save_preprocessed_data(args, dataset, dataset, adata, spatial_graph)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
     adata_filtered.var_names = np.char.upper(np.array(adata_filtered.var_names).astype(str))
-    plot_rank_marker_genes_group(args, dataset, dataset, adata_filtered, top_n_genes=5)
+    plot_rank_marker_genes_group(args, dataset, dataset, adata_filtered, top_n_genes=3)

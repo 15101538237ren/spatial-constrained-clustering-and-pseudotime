@@ -512,7 +512,7 @@ def plot_annotated_clusters(args, adatas, sample_name="merged", dataset="chicken
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
-def plot_expr_in_ST(args, adatas, gene_name, sample_name = "merged", dataset="chicken", scatter_sz= 6., cm = plt.get_cmap("magma")):
+def plot_expr_in_ST(args, adatas, gene_name, sample_name = "merged", dataset="chicken", scatter_sz= 6., cm = plt.get_cmap("RdPu")):
     args.spatial = True
     output_dir = f'{args.output_dir}/{dataset}/{sample_name}/expr_in_ST'
     mkdir(output_dir)
@@ -520,7 +520,7 @@ def plot_expr_in_ST(args, adatas, gene_name, sample_name = "merged", dataset="ch
     fig, axs = figure(2, 2, rsz=2.2, csz=3., wspace=.2, hspace=.2)
     exprs = [np.asarray(adatas[sid][:, adatas[sid].var_names == gene_name].X.todense()).flatten() for sid, sample in enumerate(samples)]
     max_exprs = [np.max(expr)for expr in exprs]
-    max_expr = max(max_exprs)
+    max_expr = max(max_exprs) * .6
     box_ratios = [.7, .7, .8, .7]
     for sid, sample in enumerate(samples):
         row = sid // 2
@@ -1039,7 +1039,7 @@ def expr_analysis_pipeline(args):
     adatas = [load_chicken_data(args, sample) for sample in sample_list]
     target_genes = ["BAMBI"]#, "CNMD", "COL1A1", "S100A6", "S100A11", "TXNDC5"]#["ACADSB", "ACBD7", "ACTA2", "ACTG2", "AKR1D1", "APOA1", "APP", "ATP6V1E1", "BAMBI", "BMP10", "BRD2", "C1H2ORF40", "C5H11orf58", "CA9", "CAV3", "CCDC80", "CD36", "CHGB", "CHODL", "CIAO2B", "CNMD", "COL14A1", "COL1A1", "COL4A1", "COL5A1", "COX17", "CPE", "CRIP1", "CSRP2", "CSTA", "CTGF", "CTSA", "DERA", "DPYSL3", "DRAXIN", "EDNRA", "ENSGALG00000004518", "ENSGALG00000013239", "ENSGALG00000015349", "ENSGALG00000020788", "ENSGALG00000028551", "ENSGALG00000040263", "ENSGALG00000050984", "ENSGALG00000053871", "FABP3", "FABP5", "FABP7", "FBLN1", "FGFR3", "FHL1", "FHL2", "FMC1", "FSTL1", "FXYD6", "GJA5", "GKN2", "GLRX5", "GPC1", "GPX3", "HADHB", "HAPLN3", "HBBR-1", "HPGD", "ID2", "ID4", "IRX4", "KRT18", "LBH", "LDHA", "LMOD2", "LSP1", "LTBP2", "LUM", "MAD2L2", "MAPK6", "MAPRE1", "MB"] + ["MFAP2", "MGP", "MOXD1", "MSX1", "MT4L", "MTFP1", "MUSTN1", "MYH1D", "MYH1F", "MYH7", "MYL1", "MYLK", "MYOM1", "MYOM2", "MYOZ2", "NIPSNAP2", "NPC2", "NRN1L", "OSTN", "OXCT1", "PECAM1", "PENK", "PERP2", "PGAP2", "PITX2", "PLN", "POSTN", "PRNP", "PRRX1", "RAMP2", "RARRES1", "RCSD1", "RD3L", "RRAD", "RSRP1", "S100A11", "S100A6", "SEC63", "SERPINE2", "SESTD1", "SFRP1", "SFRP2", "SLN", "SMAD6", "SYPL1", "TBX5", "TESC", "TFPI2", "THBS4", "TIMM9", "TMEM158", "TMEM163", "TNIP1", "TNNC2", "TPM1", "TUBAL3", "TXNDC5", "VCAN", "Wpkci-7"]#"BAMBI"
     for gene in target_genes:
-        plot_expr_in_ST(args, adatas, gene, scatter_sz=2)
+        plot_expr_in_ST(args, adatas, gene, scatter_sz=1)
 
 
 

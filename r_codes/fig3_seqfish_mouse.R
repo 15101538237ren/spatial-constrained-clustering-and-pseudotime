@@ -16,7 +16,7 @@ seqfish <- SCTransform(seqfish, assay = "Spatial", verbose = F)
 seqfish <- RunPCA(seqfish, assay = "SCT", verbose = F)
 seqfish <- RunUMAP(seqfish, reduction = "pca", dims = 1:50)
 seqfish <- FindNeighbors(seqfish, reduction = "pca", dims = 1:50)
-seqfish <- FindClusters(seqfish, resolution = 1.0, verbose = F)
+seqfish <- FindClusters(seqfish, resolution = 0.4, verbose = F)
 
 dir.output <- "../output/seqfish_mouse/seqfish_mouse/Seurat"
 dir.create(dir.output, showWarnings = F)

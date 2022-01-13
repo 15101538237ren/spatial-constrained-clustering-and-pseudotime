@@ -46,10 +46,10 @@ def plt_setting():
     plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-def figure(nrow, ncol, rsz=3., csz=3., wspace=.4, hspace=.5):
+def figure(nrow, ncol, rsz=3., csz=3., wspace=.4, hspace=.5, left=None, right=None):
     fig, axs = plt.subplots(nrow, ncol, figsize=(ncol * csz, nrow * rsz))
     plt_setting()
-    plt.subplots_adjust(wspace=wspace, hspace=hspace)
+    plt.subplots_adjust(wspace=wspace, hspace=hspace, left=left, right=right)
     return fig, axs
 
 def set_ax_for_expr_plotting(ax):
@@ -146,13 +146,13 @@ def plot_pseudotime(args, adata, sample_name, dataset="seqfish_mouse", cm = plt.
     plt.close('all')
     args.spatial = original_spatial
 
-def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm = plt.get_cmap("RdPu"), n_cols = 3, max_expr_threshold=.0):
+def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm = plt.get_cmap("RdPu"), n_cols = 4, max_expr_threshold=.0):
     args.spatial = True
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     mkdir(output_dir)
     n_genes = len(genes)
     n_rows = int(math.ceil(n_genes/n_cols))
-    fig, axs = figure(n_rows, n_cols, rsz=7.5, csz=8.0, wspace=.3, hspace=.4)
+    fig, axs = figure(n_rows, n_cols, rsz=5.5, csz=5.2, wspace=.1, hspace=.3, left=.05, right=.95)
     exprs = np.array(adata.X.todense()).astype(float)
     all_genes = np.array(adata.var_names)
 
@@ -161,19 +161,19 @@ def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm
         row = gid // n_cols
         col = gid % n_cols
         ax = axs[row][col] if n_rows > 1 else axs[col]
-        expr = exprs[:, all_genes == gene].flatten()
+        expr = exprs[:, all_genes == gene]
         expr = (expr - expr.mean())/expr.std()
         ax = set_ax_for_expr_plotting(ax)
         st = ax.scatter(x, y, s=scatter_sz, c=expr, cmap=cm, vmin=0, vmax=6)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        clb = fig.colorbar(st, cax=cax)
-        clb.ax.set_ylabel("Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
-        ax.set_title(gene, fontsize=12)
+        # if gid == len(genes) - 1:
+        #     divider = make_axes_locatable(ax)
+        #     cax = divider.append_axes("right", size="5%", pad=0.05)
+        #     clb = fig.colorbar(st, cax=cax)
+        #     clb.ax.set_ylabel("Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        ax.set_title(gene, fontsize=28, pad=20)
     fig_fp = f"{output_dir}/ST_expression.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
-
 
 def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, method="cluster", top_n_genes=3):
     original_spatial = args.spatial
@@ -182,19 +182,21 @@ def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, met
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     adata_filtered.obs[method] = pd.Categorical(pred_clusters)
     sc.tl.rank_genes_groups(adata_filtered, method, method='wilcoxon')
-    sc.pl.rank_genes_groups(adata_filtered, n_genes=25, ncols=5, fontsize=10, sharey=False, save=f"{sample_name}_ranks_gby_{method}.pdf")
-    sc.pl.rank_genes_groups_heatmap(adata_filtered, n_genes=top_n_genes, standard_scale='var',  show_gene_labels=True, save=f"{sample_name}_heatmap_gby_{method}.pdf")
+    # sc.pl.rank_genes_groups(adata_filtered, n_genes=25, ncols=5, fontsize=10, sharey=False, save=f"{sample_name}_ranks_gby_{method}.pdf")
+    # sc.pl.rank_genes_groups_heatmap(adata_filtered, n_genes=top_n_genes, standard_scale='var',  show_gene_labels=True, save=f"{sample_name}_heatmap_gby_{method}.pdf")
     sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=top_n_genes, standard_scale='var', cmap='bwr', save=f"{sample_name}_mean_expr_gby_{method}.pdf")
-    sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=top_n_genes, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save=f"{sample_name}_dot_lfc_gby_{method}.pdf")
-    sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=top_n_genes, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save=f"{sample_name}_matrix_lfc_gby_{method}.pdf")
-    sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=top_n_genes, cmap='bwr', colorbar_title='Mean Expr.', save=f"{sample_name}_matrix_mean_expr_gby_{method}.pdf")
+    # sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=top_n_genes, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save=f"{sample_name}_dot_lfc_gby_{method}.pdf")
+    # sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=top_n_genes, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save=f"{sample_name}_matrix_lfc_gby_{method}.pdf")
+    # sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=top_n_genes, cmap='bwr', colorbar_title='Mean Expr.', save=f"{sample_name}_matrix_mean_expr_gby_{method}.pdf")
 
-    files = [f"rank_genes_groups_cluster{sample_name}_ranks_gby_{method}.pdf",
-             f"heatmap{sample_name}_heatmap_gby_{method}.pdf",
-             f"dotplot_{sample_name}_mean_expr_gby_{method}.pdf",
-             f"dotplot_{sample_name}_dot_lfc_gby_{method}.pdf",
-             f"matrixplot_{sample_name}_matrix_lfc_gby_{method}.pdf",
-             f"matrixplot_{sample_name}_matrix_mean_expr_gby_{method}.pdf"]
+    files = [
+             # f"rank_genes_groups_cluster{sample_name}_ranks_gby_{method}.pdf",
+             # f"heatmap{sample_name}_heatmap_gby_{method}.pdf",
+             f"dotplot_{sample_name}_mean_expr_gby_{method}.pdf"#,
+             # f"dotplot_{sample_name}_dot_lfc_gby_{method}.pdf",
+             # f"matrixplot_{sample_name}_matrix_lfc_gby_{method}.pdf",
+             # f"matrixplot_{sample_name}_matrix_mean_expr_gby_{method}.pdf"
+             ]
 
     for file in files:
         src_fp = f"./figures/{file}"
@@ -247,7 +249,7 @@ def basic_pipeline(args):
     else:
         adata = load_seqfish_mouse_data()
         adata_filtered, spatial_graph = preprocessing_data(args, adata)
-        save_preprocessed_data(args, dataset, dataset, adata, spatial_graph)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
 
     # train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=30, isTrain=False)
     plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
@@ -255,10 +257,10 @@ def basic_pipeline(args):
 
 def expr_analysis_pipeline(args):
     dataset = "seqfish_mouse"
-    genes = ["Tbx1", "Sox2", "Foxa1", "Lhx2", "Otx2", "Hand1", "Popdc2", "Ttn", "Cldn4"]
+    genes = ["Tbx1", "Sox2", "Foxa1", "Lhx2", "Otx2", "Hand1", "Ttn", "Cldn4"]
     print(f'===== Data: {dataset} =====')
     adata = load_seqfish_mouse_data()
-    plot_expr_in_ST(args, adata, genes, dataset, dataset, scatter_sz=1.5)
+    plot_expr_in_ST(args, adata, genes, dataset, dataset, scatter_sz=2.0)
 
 def marker_gene_pipeline(args):
     dataset = "seqfish_mouse"
@@ -270,6 +272,6 @@ def marker_gene_pipeline(args):
     else:
         adata = load_seqfish_mouse_data()
         adata_filtered, spatial_graph = preprocessing_data(args, adata)
-        save_preprocessed_data(args, dataset, dataset, adata, spatial_graph)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
     adata_filtered.var_names = np.char.upper(np.array(adata_filtered.var_names).astype(str))
-    plot_rank_marker_genes_group(args, dataset, dataset, adata_filtered, top_n_genes=5)
+    plot_rank_marker_genes_group(args, dataset, dataset, adata_filtered, top_n_genes=3)

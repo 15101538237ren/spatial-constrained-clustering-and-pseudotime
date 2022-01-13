@@ -15,7 +15,7 @@ slide.seq <- SCTransform(slide.seq, assay = "Spatial", verbose = F)
 slide.seq <- RunPCA(slide.seq)
 slide.seq <- RunUMAP(slide.seq, dims = 1:50)
 slide.seq <- FindNeighbors(slide.seq, dims = 1:50)
-slide.seq <- FindClusters(slide.seq, resolution = 1.0, verbose = F)
+slide.seq <- FindClusters(slide.seq, resolution = 0.4, verbose = F)
 
 
 dir.output <- "../output/slideseq_v2/slideseq_v2/Seurat"

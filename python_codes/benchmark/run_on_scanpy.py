@@ -77,7 +77,7 @@ def scanpy_pseudotime(args, adata, dataset, sample_name, n_neighbors=20, root_ce
 
 
 def plot_clustering(args, adata, sample_name, dataset, method="leiden", cm= plt.get_cmap("tab20"), scale=.62, scatter_sz=1., nrow= 1):
-    fig, ax, x, y, xlim, ylim = plot_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=1, rsz=5, csz=5.5, wspace=.3, hspace=.4)
+    fig, ax, x, y, xlim, ylim = plot_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=1, rsz=5, csz=6, wspace=.3, hspace=.4)
     output_dir = f'{args.output_dir}/{dataset}/{sample_name}/scanpy'
     pred_clusters = pd.read_csv(f"{output_dir}/{method}.tsv", header=None).values.flatten().astype(int)
     uniq_pred = np.unique(pred_clusters)
@@ -85,20 +85,19 @@ def plot_clustering(args, adata, sample_name, dataset, method="leiden", cm= plt.
     for cid, cluster in enumerate(uniq_pred):
         color = cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
         ind = pred_clusters == cluster
-        ax.scatter(x[ind], y[ind], s=scatter_sz, color=color, label=cluster, marker=".")
+        if dataset == "stereo_seq":
+            ax.scatter(-y[ind], x[ind], s=scatter_sz, color=color, label=cluster, marker=".")
+        else:
+            ax.scatter(x[ind], y[ind], s=scatter_sz, color=color, label=cluster, marker=".")
     ax.set_facecolor("none")
-    title = "Scanpy"
-    ax.set_title(title, fontsize=title_sz, pad=-30)
-    ax.set_xlim(xlim)
-    ax.set_ylim(ylim)
     ax.invert_yaxis()
-    # box = ax.get_position()
-    # height_ratio = 1.0
-    # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
-    # lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.1,
-    #                  borderaxespad=.1)
-    # for handle in lgnd.legendHandles:
-    #     handle._sizes = [8]
+    box = ax.get_position()
+    height_ratio = 1.0
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
+    lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.1,
+                     borderaxespad=.1)
+    for handle in lgnd.legendHandles:
+        handle._sizes = [8]
     fig_fp = f"{output_dir}/{method}.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
@@ -135,9 +134,9 @@ def basic_pipeline(args):
         else:
             adata = load_datasets(args, dataset)
             adata_filtered, spatial_graph = preprocessing_data(args, adata)
-            save_preprocessed_data(args, dataset, dataset, adata, spatial_graph)
-        sc.tl.pca(adata_filtered, svd_solver='arpack')
-        scanpy_clustering(args, adata_filtered, dataset, dataset, "leiden", n_neighbors=n_neighbors, resolution=resolution)
+            save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+        # sc.tl.pca(adata_filtered, svd_solver='arpack')
+        # scanpy_clustering(args, adata_filtered, dataset, dataset, "leiden", n_neighbors=n_neighbors, resolution=resolution)
         #scanpy_pseudotime(args, adata_filtered, dataset, dataset, n_neighbors=n_neighbors, resolution=resolution)
         plot_clustering(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)
         #plot_pseudotime(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)

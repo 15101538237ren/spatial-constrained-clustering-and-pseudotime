@@ -18,18 +18,18 @@ sample_list = ['151671'] #['151510', '151671', '151673']
 for sample_idx, sample_name in enumerate(sample_list):
     print(f'===== Project {sample_idx + 1} : {sample_name}')
     # anno_clusters = get_annotations_dlpfc(args, sample_name)
-    for spatial in [False, True]:
-        args.spatial = spatial
-        adata = load_DLPFC_data(args, sample_name)
-        adata_filtered, spatial_graph = preprocessing_data(args, adata)
-        embedding = train(args, adata_filtered, spatial_graph)
+    # for spatial in [False, True]:
+    #     args.spatial = spatial
+    #     adata = load_DLPFC_data(args, sample_name)
+    #     adata_filtered, spatial_graph = preprocessing_data(args, adata)
+    #     embedding = train(args, adata_filtered, spatial_graph)
     #     save_features(args, embedding, dataset, sample_name)
     #     clustering(args, dataset, sample_name, clustering_method)
     #     pseudotime(args, dataset, sample_name, root_cell_type="WM", cell_types=anno_clusters)
     # plot_clustering(args, sample_name, clustering_method)
-    plot_clustering_comparison(args, sample_name, clustering_method)
+    # plot_clustering_comparison(args, sample_name, clustering_method)
     # plot_pseudotime(args, sample_name)
-    plot_umap_comparison(args, sample_name)
+    # plot_umap_comparison(args, sample_name)
     # plot_pseudotime_comparison(args, sample_name, root_cell_type="WM", cell_types=anno_clusters)
     # rank_marker_genes_group(args, sample_name, clustering_method)
-    # plot_marker_gene_expression(args, sample_name, gene_names=["SCGB1D2", "PCP4", "HOPX", "SAA1"])
+    plot_marker_gene_expression(args, sample_name, gene_names=["SCGB1D2", "PCP4", "HOPX", "SAA1"])

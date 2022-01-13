@@ -327,7 +327,8 @@ def plot_marker_gene_expression(args, sample_name, gene_names, dataset="DLPFC", 
     adata = load_DLPFC_data(args, sample_name, v2=False)
     coord = adata.obsm['spatial'].astype(float) * scale
     x, y = coord[:, 0], coord[:, 1]
-    adata_filtered, _, genes, _, _, _ = preprocessing_data(args, adata)
+    adata_filtered, _ = preprocessing_data(args, adata)
+    genes = np.array(adata_filtered.var_names)
     expr = np.asarray(adata.X.todense())
     fig, axs = figure(nrow, ncol, rsz=2.5, csz=2.6, wspace=.2, hspace=.2)
     xlimits = [130, 550]
@@ -341,7 +342,7 @@ def plot_marker_gene_expression(args, sample_name, gene_names, dataset="DLPFC", 
         ax.set_ylim(ylimits)
         ax.invert_yaxis()
         ax.set_title(gene)
-        gene_expr = expr[:, genes.index(gene)].flatten()
+        gene_expr = expr[:, genes == gene].flatten()
         gene_expr /= np.max(gene_expr)
         st = ax.scatter(x, y, s=1.3, c=gene_expr, cmap=cm)
         ax.set_title(gene, fontsize=14, pad=-30)
