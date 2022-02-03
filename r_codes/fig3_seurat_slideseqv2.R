@@ -21,6 +21,6 @@ slide.seq <- FindClusters(slide.seq, resolution = 0.4, verbose = F)
 dir.output <- "../output/slideseq_v2/slideseq_v2/Seurat"
 dir.create(dir.output, showWarnings = F)
 
-write.table(slide.seq@reductions$pca@cell.embeddings, file = file.path(dir.output, 'seurat.PCs.tsv'), sep='\t', quote=F)
+write.table(slide.seq@reductions$pca@cell.embeddings, file = file.path(dir.output, 'seurat.PCs.tsv'), sep='\t', quote=F, row.names = F)
 
 write.table(slide.seq@meta.data, file = file.path(dir.output, './metadata.tsv'), sep='\t', quote=F)

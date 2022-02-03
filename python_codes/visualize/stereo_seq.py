@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 import os, math, shutil
-# from python_codes.train.train import train
+from scipy.spatial import distance_matrix
+from scipy.stats import pearsonr
+#from python_codes.train.train import train
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
 from python_codes.util.util import load_stereo_seq_data, preprocessing_data, save_preprocessed_data, load_preprocessed_data, save_features
 import warnings
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
+from python_codes.util.exchangeable_loom import write_exchangeable_loom
 warnings.filterwarnings("ignore")
 from python_codes.util.util import *
+from matplotlib.colors import to_hex
 from matplotlib import rcParams
 rcParams['font.family'] = 'sans-serif'
 rcParams['font.sans-serif'] = ['Arial','Roboto']
@@ -28,6 +32,21 @@ def get_clusters(args, dataset, sample_name, method="leiden"):
     pred_clusters = pd.read_csv(f"{output_dir}/{method}.tsv", header=None).values.flatten().astype(str)
     args.spatial = original_spatial
     return pred_clusters
+
+def calc_pseudotime_corr_genes(args, adata, sample_name, dataset, n_top=16):
+    original_spatial = args.spatial
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    pseudotimes = pd.read_csv(f"{output_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
+    adata, _ = preprocessing_data(args, adata)
+    expr = adata.X
+    genes = np.array(adata.var_names)
+    gene_corrs = [[gene] + list(pearsonr(expr[:, gix].flatten(), pseudotimes)) for gix, gene in enumerate(genes)]
+    gene_corrs.sort(key=lambda k:k[-1])
+    df = pd.DataFrame(gene_corrs, columns=["gene", "corr", "p-val"])
+    df.to_csv(f"{output_dir}/Gene_Corr_with_PST.tsv", index=False)
+    args.spatial = original_spatial
+    return df.values[:n_top, 0].astype(str)
 
 ####################################
 #-------------Plotting-------------#
@@ -143,7 +162,7 @@ def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm
         row = gid // n_cols
         col = gid % n_cols
         ax = axs[row][col] if n_rows > 1 else axs[col]
-        expr = exprs[:, all_genes == gene]
+        expr = exprs[:, all_genes == gene.upper()]
         expr = (expr - expr.mean())/expr.std()
         ax = set_ax_for_expr_plotting(ax)
         st = ax.scatter(-y, x, s=scatter_sz, c=expr, cmap=cm, vmin=0, vmax=4)
@@ -155,6 +174,145 @@ def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm
         #     clb.ax.set_ylabel("Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
         ax.set_title(gene, fontsize=30)
     fig_fp = f"{output_dir}/ST_expression.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
+def plot_umap_comparison_with_coord_alpha(args, sample_name, dataset, n_neighbors=15):
+    methods = ["scanpy",  "Seurat", "DGI", "DGI_SP"]
+    files = ["PCA.tsv", "seurat.PCs.tsv", "features.tsv", "features.tsv"]
+    nrow, ncol = 1, len(methods)
+
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
+    if os.path.exists(f"{data_root}/adata.h5ad"):
+        adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
+    else:
+        adata = load_stereo_seq_data(args)
+        adata_filtered, spatial_graph = preprocessing_data(args, adata)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+
+    coord = adata_filtered.obsm['spatial'].astype(float)
+    x, y = coord[:, 0], coord[:, 1]
+    normed_x = (x - np.min(x))/(np.max(x) - np.min(x))
+    normed_y = (y - np.min(y))/(np.max(y) - np.min(y))
+    normed_c = np.sqrt(normed_x**2 + normed_y**2)
+    normed_c = (normed_c - np.min(normed_c))/(np.max(normed_c) - np.min(normed_c))
+
+    data_root = f'{args.dataset_dir}/{dataset}/{sample_name}'
+    fig, axs = figure(nrow, ncol, rsz=5.5, csz=6., wspace=.1, hspace=.1, left=.05, right=.95)
+    for ax in axs:
+        ax.axis('off')
+
+    for mid, method in enumerate(methods):
+        print(f"Processing {sample_name} {method}")
+        col = mid % ncol
+        ax = axs[col]
+        output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
+        umap_positions_fp = f"{output_dir}/umap_positions.tsv"
+        if not os.path.exists(umap_positions_fp):
+            file_name = files[mid]
+            feature_fp = f'{output_dir}/{file_name}'
+            adata = sc.read_csv(feature_fp, delimiter="\t")
+            sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
+            sc.tl.umap(adata)
+            umap_positions = adata.obsm["X_umap"]
+            np.savetxt(umap_positions_fp, umap_positions, fmt='%.5f\t%.5f', header='', footer='', comments='')
+        else:
+            umap_positions = pd.read_csv(umap_positions_fp, header=None, sep="\t").values.astype(float)
+
+        if method != "Seurat":
+            pred_clusters = pd.read_csv(f"{output_dir}/leiden.tsv", header=None).values.flatten().astype(int)
+        else:
+            pred_clusters = pd.read_csv(f"{output_dir}/metadata.tsv", sep="\t")["seurat_clusters"].values.flatten().astype(int)
+        cluster_names = list(np.unique(pred_clusters))
+        n_cluster = len(cluster_names)
+        cm = plt.get_cmap("tab20")
+        for cid, cluster in enumerate(cluster_names):
+            ind = pred_clusters == cluster
+            umap_sub = umap_positions[ind]
+            alphas = normed_c[ind]
+            color = to_hex(cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster))
+            color_gradients = linear_gradient(color, n=6)["hex"]
+            n = umap_sub.shape[0]
+            colors = np.array([color_gradients[int(alphas[i] // 0.2) + 1] for i in range(n)])
+            ax.scatter(umap_sub[:, 0], umap_sub[:, 1], s=1, color=colors, label=cluster)
+        if mid == len(methods) - 1:
+            box = ax.get_position()
+            height_ratio = 1.0
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
+            ax.legend(loc='center left', fontsize='x-small', bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.05,
+                      borderaxespad=.1)
+        ax.set_title(method.replace("_", " + "), fontsize=title_sz)
+    fig_fp = f"{output_dir}/umap_comparison-calpha.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
+def plot_pseudotime_comparison(args, sample_name, dataset, cm = plt.get_cmap("Spectral"), n_neighbors=15):
+    methods = ["monocole", "slingshot", "DPT", "scanpy", "Seurat", "DGI", "DGI_SP"]
+    files = [None, None, None, None, None, "features.tsv", "features.tsv"]
+    nrow, ncol = 2, 4
+
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
+    if os.path.exists(f"{data_root}/adata.h5ad"):
+        adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
+    else:
+        adata = load_stereo_seq_data(args)
+        adata_filtered, spatial_graph = preprocessing_data(args, adata)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+
+    coord = adata_filtered.obsm['spatial'].astype(float)
+    x, y = coord[:, 0], coord[:, 1]
+
+    fig, axs = figure(nrow, ncol, rsz=5.5, csz=6., wspace=.1, hspace=.1, left=.05, right=.95)
+
+    for mid, method in enumerate(methods):
+        print(f"Processing {sample_name} {method}")
+        row = mid // ncol
+        col = mid % ncol
+        ax = axs[row][col] if nrow > 1 else axs[col]
+        ax.axis('off')
+        output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
+        mkdir(output_dir)
+        pseudotime_fp = f"{output_dir}/pseudotime.tsv"
+        if not os.path.exists(pseudotime_fp):
+            if mid == 0:
+                adata = adata_filtered
+                sc.pp.pca(adata, n_comps=50)
+                sc.pp.neighbors(adata, n_neighbors=n_neighbors)
+            else:
+                file_name = files[mid]
+                feature_fp = f'{output_dir}/{file_name}'
+                adata = sc.read_csv(feature_fp, delimiter="\t")
+                sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
+            sc.tl.umap(adata)
+            sc.tl.leiden(adata, resolution=.8)
+            sc.tl.paga(adata)
+            n_max_sample = 500
+            if adata.shape[0] < n_max_sample:
+                sub_adata_x = adata.X
+            else:
+                indices = np.arange(adata.shape[0])
+                selected_ind = np.random.choice(indices, n_max_sample, False)
+                sub_adata_x = adata.X[selected_ind, :]
+            sum_dists = distance_matrix(sub_adata_x, sub_adata_x).sum(axis=1)
+            adata.uns['iroot'] = np.argmax(sum_dists)
+            print("Completed Distance Matrix Calculation")
+            sc.tl.diffmap(adata)
+            sc.tl.dpt(adata)
+            print("Completed DPT Calculation")
+            pseudotimes = adata.obs['dpt_pseudotime'].to_numpy()
+            np.savetxt(pseudotime_fp, pseudotimes, fmt='%.5f', header='', footer='', comments='')
+            print("Saved %s succesful!" % pseudotime_fp)
+        else:
+            pseudotimes = pd.read_csv(pseudotime_fp, header=None).values.flatten().astype(float)
+        st = ax.scatter(x, y, s=1, c=pseudotimes, cmap=cm)
+        if col == (ncol - 1):
+            axins = inset_locator.inset_axes(ax, width="5%", height="60%",  loc='lower left', bbox_to_anchor=(1.05, 0.1, 1, 1), bbox_transform=ax.transAxes, borderpad=0)
+            clb = fig.colorbar(st, cax=axins)
+            clb.set_ticks([0.0, 1.0])
+            clb.set_ticklabels(["0", "1"])
+            clb.ax.set_ylabel("pseudotime", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        ax.set_title(method.replace("_", " + "), fontsize=title_sz)
+    fig_fp = f"{output_dir}/psudotime_comparison.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
@@ -197,26 +355,87 @@ def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, met
 #-------------Pipelines------------#
 ####################################
 
-def export_data_pipeline(args):
+def export_loom_pipeline(args):
     dataset = "stereo_seq"
     data_root = f'{args.dataset_dir}/{dataset}/{dataset}/export'
     mkdir(data_root)
 
     adata = load_stereo_seq_data(args)
-    adata.write(f'{data_root}/adata.h5ad')
+    write_exchangeable_loom(adata, f'{data_root}/adata.loom')
 
     locs = pd.DataFrame(adata.obsm["spatial"], columns=["x", "y"])
     locs.to_csv(f"{data_root}/locs.tsv", sep="\t", index=False)
     print(f'===== Exported {dataset} =====')
 
-def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="stereo_seq", clustering_method="leiden", resolution=.3, n_neighbors=15, isTrain=True):
+def export_data_pipeline(args, filtered = True):
+    dataset = "stereo_seq"
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/export'
+    mkdir(data_root)
+
+    if filtered:
+        if os.path.exists(f"{args.dataset_dir}/{dataset}/{dataset}/preprocessed/adata.h5ad"):
+            adata, _ = load_preprocessed_data(args, dataset, dataset)
+        else:
+            adata = load_stereo_seq_data(args)
+            adata, spatial_graph = preprocessing_data(args, adata)
+            save_preprocessed_data(args, dataset, dataset, adata, spatial_graph)
+        write_exchangeable_loom(adata, f'{data_root}/adata_filtered.loom')
+    else:
+        adata = load_stereo_seq_data(args)
+        adata.write(f'{data_root}/adata.h5ad')
+    locs = pd.DataFrame(adata.obsm["spatial"], columns=["x", "y"])
+    locs.to_csv(f"{data_root}/locs.tsv", sep="\t", index=False)
+    print(f'===== Exported {dataset} =====')
+
+def export_pca_and_cluster_pipeline_for_slingshot(args):
+    dataset = "stereo_seq"
+    dataset_dir = f"{args.dataset_dir}/{dataset}/{dataset}"
+    data_root = f'{dataset_dir}/preprocessed'
+    if os.path.exists(f"{data_root}/adata.h5ad"):
+        adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
+    else:
+        adata = load_stereo_seq_data(args)
+        adata_filtered, spatial_graph = preprocessing_data(args, adata)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+    sc.pp.neighbors(adata_filtered, n_neighbors=15)
+    sc.tl.leiden(adata_filtered, resolution=.45)
+
+    output_dir = f'{dataset_dir}/export'
+    mkdir(output_dir)
+
+    pcs = np.array(adata_filtered.obsm["X_pca"])
+    df_pcs = pd.DataFrame(pcs)
+    df_pcs.to_csv(f'{output_dir}/pcs.tsv', sep='\t', index=False)
+
+    df_cluster = pd.DataFrame(np.array(adata_filtered.obs["leiden"]), columns=["leiden_label"])
+    df_cluster.to_csv(f'{output_dir}/leiden.tsv', sep='\t', index=False)
+
+    print(f'===== Exported {dataset} =====')
+
+def res_search(adata, target_n_cluster, increment=0.02):
+
+    for res in sorted(list(np.arange(0.2, 2.5, increment)), reverse=False):
+        sc.tl.leiden(adata, random_state=0, resolution=res)
+
+        count_unique = len(pd.DataFrame(adata.obs["leiden"]).leiden.unique())
+
+        print(f"Try resolution {res} found {count_unique} clusters: target {target_n_cluster}")
+
+        if count_unique == target_n_cluster:
+            print(f"Found resolution: {res}")
+            return res
+        elif count_unique > target_n_cluster:
+            print(f"Found resolution: {(res - increment)}")
+            return res - increment
+
+def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="stereo_seq", clustering_method="leiden", resolution=1.0, n_neighbors=15, isTrain=True):
     for spatial in [False, True]:
         args.spatial = spatial
         if isTrain:
             embedding = train(args, adata_filtered, spatial_graph)
             save_features(args, embedding, dataset, sample_name)
-        clustering(args, dataset, sample_name, clustering_method, n_neighbors=n_neighbors, resolution=resolution)
-        pseudotime(args, dataset, sample_name, root_cell_type=None, cell_types=None, n_neighbors=n_neighbors,
+        #clustering(args, dataset, sample_name, clustering_method, n_neighbors=n_neighbors, resolution=resolution)
+        pseudotime(args, dataset, sample_name, n_neighbors=n_neighbors,
                    resolution=resolution)
 
 def basic_pipeline(args):
@@ -224,16 +443,32 @@ def basic_pipeline(args):
 
     print(f'===== Data: {dataset} =====')
     data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
-    if os.path.exists(f"{data_root}/adata.h5ad"):
-        adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
+    # if os.path.exists(f"{data_root}/adata.h5ad"):
+    #     adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
+    # else:
+    #     adata = load_stereo_seq_data(args)
+    #     adata_filtered, spatial_graph = preprocessing_data(args, adata)
+    #     save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+
+    #train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=20, isTrain=False)
+    #plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1.5)
+    # plot_pseudotime(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
+    # plot_umap_comparison_with_coord_alpha(args, dataset, dataset)
+    plot_pseudotime_comparison(args, dataset, dataset)
+
+def corr_expr_analysis_pipeline(args):
+    dataset = "stereo_seq"
+    print(f'===== Data: {dataset} =====')
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/export'
+    mkdir(data_root)
+    adata_fp = f'{data_root}/adata.h5ad'
+    if os.path.exists(adata_fp):
+        adata = sc.read_h5ad(adata_fp)
     else:
         adata = load_stereo_seq_data(args)
-        adata_filtered, spatial_graph = preprocessing_data(args, adata)
-        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
-
-    #train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=15, isTrain=False)
-    plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1.5)
-    #plot_pseudotime(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
+    print(f'===== Readed Data: {dataset} =====')
+    genes_corred = calc_pseudotime_corr_genes(args, adata, dataset, dataset)
+    plot_expr_in_ST(args, adata, genes_corred, dataset, dataset, scatter_sz=2.)
 
 def expr_analysis_pipeline(args):
     dataset = "stereo_seq"

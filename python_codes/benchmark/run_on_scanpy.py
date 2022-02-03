@@ -44,11 +44,29 @@ def plot_annotation(args, adata, sample_name, nrow = 1, scale = 0.045, ncol=4, r
     xlim, ylim = None, None
     return fig, ax, x, y, xlim, ylim
 
-def scanpy_clustering(args, adata, dataset, sample_name, method = "leiden", n_neighbors=50, resolution=1.0):
+
+def res_search_fixed_clus(clustering_method, adata, fixed_clus_count, increment=0.02):
+    for res in sorted(list(np.arange(0.2, 2.5, increment)), reverse=False):
+        if clustering_method == "leiden":
+            sc.tl.leiden(adata, random_state=0, resolution=res)
+            count_unique = len(pd.DataFrame(adata.obs[clustering_method]).leiden.unique())
+        else:
+            sc.tl.louvain(adata, random_state=0, resolution=res)
+            count_unique = len(np.unique(pd.DataFrame(adata.obs[clustering_method].cat.codes.values).values.flatten()))
+        print("Try resolution %3f found %d clusters: target %d" % (res, count_unique, fixed_clus_count))
+        if count_unique == fixed_clus_count:
+            print("Found resolution:" + str(res))
+            return res
+        elif count_unique > fixed_clus_count:
+            print("Found resolution: %.3f" % (res - increment))
+            return res - increment
+
+def scanpy_clustering(args, adata, dataset, sample_name, method = "leiden", n_neighbors=50, ncluster = 8):
     output_dir = f'{args.output_dir}/{dataset}/{sample_name}/scanpy'
     mkdir(output_dir)
     cluster_fp = os.path.join(output_dir, f"{method}.tsv")
     sc.pp.neighbors(adata, n_neighbors=n_neighbors)
+    resolution = res_search_fixed_clus(method, adata, ncluster)
     sc.tl.leiden(adata, resolution=float(resolution))
     labels = adata.obs["leiden"].cat.codes
     np.savetxt(cluster_fp, labels, fmt='%d', header='', footer='', comments='')
@@ -74,6 +92,16 @@ def scanpy_pseudotime(args, adata, dataset, sample_name, n_neighbors=20, root_ce
     pseudotimes = adata.obs['dpt_pseudotime'].to_numpy()
     np.savetxt(pseudotime_fp, pseudotimes, fmt='%.5f', header='', footer='', comments='')
     print("Saved %s succesful!" % pseudotime_fp)
+
+def scanpy_pca(args, adata, dataset, sample_name, n_comps=2):
+    output_dir = f'{args.output_dir}/{dataset}/{sample_name}/scanpy'
+    mkdir(output_dir)
+    pca_fp = os.path.join(output_dir, "PCA.tsv")
+
+    sc.pp.pca(adata, n_comps=n_comps)
+    PCs = adata.obsm['X_pca']
+    np.savetxt(pca_fp, PCs, fmt='%.5f\t%.5f', header='', footer='', comments='')
+    print("Saved %s succesful!" % pca_fp)
 
 
 def plot_clustering(args, adata, sample_name, dataset, method="leiden", cm= plt.get_cmap("tab20"), scale=.62, scatter_sz=1., nrow= 1):
@@ -125,7 +153,7 @@ def basic_pipeline(args):
     args.output_dir = f'../../output'
     n_neighbors = 15
     resolution = 1.0
-    datasets = ["stereo_seq"] #"slideseq_v2","seqfish_mouse",
+    datasets = ["stereo_seq"] #, "slideseq_v2","seqfish_mouse"
     for dataset in datasets:
         print(f'===== Data {dataset} =====')
         data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
@@ -136,10 +164,11 @@ def basic_pipeline(args):
             adata_filtered, spatial_graph = preprocessing_data(args, adata)
             save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
         # sc.tl.pca(adata_filtered, svd_solver='arpack')
-        # scanpy_clustering(args, adata_filtered, dataset, dataset, "leiden", n_neighbors=n_neighbors, resolution=resolution)
+        # scanpy_clustering(args, adata_filtered, dataset, dataset, "leiden", n_neighbors=n_neighbors, ncluster=8)
         #scanpy_pseudotime(args, adata_filtered, dataset, dataset, n_neighbors=n_neighbors, resolution=resolution)
+        #scanpy_pca(args, adata_filtered, dataset, dataset)
         plot_clustering(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)
-        #plot_pseudotime(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)
+        # plot_pseudotime(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)
 
 if __name__ == "__main__":
     basic_pipeline(args)

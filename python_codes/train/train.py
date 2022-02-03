@@ -51,7 +51,9 @@ def train(args, adata_filtered, sp_graph, random_seed = 42):
             sp_dists = sp_dists/torch.max(sp_dists)
 
             penalty_1 = torch.div(torch.sum(torch.mul(1.0 - z_dists, sp_dists)), z_dists.size(dim=0)).to(args.device)
-            loss = loss + args.penalty_scaler * penalty_1
+            #penalty_2 = torch.div(torch.sum(torch.mul(z_dists, 1.0 - sp_dists)), z_dists.size(dim=0)).to(args.device)
+            #penalty_3 = torch.div(torch.sum(torch.mul(z_dists, sp_dists)), z_dists.size(dim=0)).to(args.device)
+            loss = loss + args.penalty_scaler * penalty_1# + args.penalty_scaler * penalty_2 * .4
 
         loss.backward()
         optimizer.step()

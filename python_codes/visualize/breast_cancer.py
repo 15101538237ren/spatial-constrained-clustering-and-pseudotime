@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy.spatial.distance import cdist
-from scipy.stats import wilcoxon
+from scipy.stats import wilcoxon, pearsonr
 from scipy.spatial import distance_matrix
 from sklearn.decomposition import PCA
 # from python_codes.train.train import train
@@ -358,13 +358,13 @@ def plot_pseudotime(args, adata, sample_name, dataset="breast_cancer", cm = plt.
     plt.close('all')
     args.spatial = original_spatial
 
-def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", dataset="breast_cancer", scale = 1., scatter_sz=1.3, nrow = 1, annotation=False):
+def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", dataset="breast_cancer", scale = 1., scatter_sz=1.3, nrow = 1, annotation=False, alpha=.5):
     original_spatial = args.spatial
     args.spatial = True
     fig, axs, x, y, img, xlim, ylim = plot_hne_and_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=4, rsz=2.6,
                                                               csz=3.9, wspace=1, hspace=.4, annotation=annotation)
     ax = axs[1]
-    ax.imshow(img)
+    ax.imshow(img, alpha=alpha)
     # fp = f'{args.dataset_dir}/Visium/Breast_Cancer/ST-pat/img/{sample_name[0]}1_annotated.png'
     # img2 = plt.imread(fp)
     # ax.imshow(img2)
@@ -385,7 +385,7 @@ def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", da
     ax.legend(fontsize=8, loc='center left', bbox_to_anchor=(1.0, 0.5))
 
     ax = axs[2]
-    ax.imshow(img)
+    ax.imshow(img, alpha=alpha)
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     pred_clusters = pd.read_csv(f"{output_dir}/{method}.tsv", header=None).values.flatten().astype(str)
     uniq_pred = np.unique(pred_clusters)
@@ -408,7 +408,7 @@ def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", da
     ax.invert_yaxis()
 
     ax = axs[3]
-    ax.imshow(img)
+    ax.imshow(img, alpha=alpha)
 
     pseudotimes = pd.read_csv(f"{output_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
     pseudo_time_cm = plt.get_cmap("gist_rainbow")
@@ -503,10 +503,11 @@ def plot_expr_in_ST(args, adata, genes, sample_name, fig_name, dataset="breast_c
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
         ax.invert_yaxis()
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        clb = fig.colorbar(st, cax=cax)
-        clb.ax.set_ylabel("Z-score of Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        if col == n_cols - 1:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            clb = fig.colorbar(st, cax=cax)
+            clb.ax.set_ylabel("Z-score of Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
         ax.set_title(gene, fontsize=12)
     fig_fp = f"{output_dir}/{fig_name}.pdf"
     plt.savefig(fig_fp, dpi=300)
@@ -815,6 +816,27 @@ def figure_pipeline(args):
         # plot_clustering(args, adata, sample_name, scatter_sz=3, annotation=False, scale=1)
         # plot_pseudotime(args, adata, sample_name)
 
+def calc_pseudotime_corr_genes(args, adata, sample_name, dataset, n_top=16):
+    original_spatial = args.spatial
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    pseudotimes = pd.read_csv(f"{output_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
+    adata, _ = preprocessing_data(args, adata)
+    expr = adata.X
+    genes = np.array(adata.var_names)
+    gene_corrs = [[gene] + list(pearsonr(expr[:, gix].flatten(), pseudotimes)) for gix, gene in enumerate(genes)]
+    gene_corrs.sort(key=lambda k:k[-1])
+    df = pd.DataFrame(gene_corrs, columns=["gene", "corr", "p-val"])
+    df.to_csv(f"{output_dir}/Gene_Corr_with_PST.tsv", index=False)
+    args.spatial = original_spatial
+    return df.values[:n_top, 0].astype(str)
+
+def corr_expr_analysis_pipeline(args):
+    sample_list = ["G1"]
+    for sample_name in sample_list:
+        adata, _ = load_breast_cancer_data(args, sample_name)
+        genes_corred = calc_pseudotime_corr_genes(args, adata, sample_name, "breast_cancer",n_top=20)
+        plot_expr_in_ST(args, adata, genes_corred, sample_name, "Genes_Corr_wt_PST", scatter_sz=7)
 
 def expr_analysis_pipeline(args):
     sample_list = ["G1"]

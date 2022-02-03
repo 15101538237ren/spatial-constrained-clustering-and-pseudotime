@@ -21,6 +21,6 @@ seqfish <- FindClusters(seqfish, resolution = 0.4, verbose = F)
 dir.output <- "../output/seqfish_mouse/seqfish_mouse/Seurat"
 dir.create(dir.output, showWarnings = F)
 
-write.table(seqfish@reductions$pca@cell.embeddings, file = file.path(dir.output, 'seurat.PCs.tsv'), sep='\t', quote=F)
+write.table(seqfish@reductions$pca@cell.embeddings, file = file.path(dir.output, 'seurat.PCs.tsv'), sep='\t', quote=F, row.names = F)
 
 write.table(seqfish@meta.data, file = file.path(dir.output, './metadata.tsv'), sep='\t', quote=F)

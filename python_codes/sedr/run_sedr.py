@@ -80,6 +80,21 @@ def get_params():
     params.device = device
     return params
 
+def res_search_fixed_clus(clustering_method, adata, fixed_clus_count, increment=0.02):
+    for res in sorted(list(np.arange(0.2, 2.5, increment)), reverse=False):
+        if clustering_method == "leiden":
+            sc.tl.leiden(adata, random_state=0, resolution=res)
+            count_unique = len(pd.DataFrame(adata.obs[clustering_method]).leiden.unique())
+        else:
+            sc.tl.louvain(adata, random_state=0, resolution=res)
+            count_unique = len(np.unique(pd.DataFrame(adata.obs[clustering_method].cat.codes.values).values.flatten()))
+        print("Try resolution %3f found %d clusters: target %d" % (res, count_unique, fixed_clus_count))
+        if count_unique == fixed_clus_count:
+            print("Found resolution:" + str(res))
+            return res
+        elif count_unique > fixed_clus_count:
+            print("Found resolution: %.3f" % (res - increment))
+            return res - increment
 
 def plot_clustering(args, adata, sample_name, dataset, method="leiden", cm= plt.get_cmap("tab20"), scale=.62, scatter_sz=1., nrow= 1):
     fig, ax, x, y, xlim, ylim = plot_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=1, rsz=5, csz=6, wspace=.1, hspace=.1, left=.1, right=.95)
@@ -132,7 +147,7 @@ def plot_pipeline():
     params = get_params()
     args.dataset_dir = f'../../data'
     args.output_dir = f'../../output'
-    datasets = ["stereo_seq"] #"slideseq_v2", "seqfish_mouse",
+    datasets = ["slideseq_v2", "seqfish_mouse", "stereo_seq"] #
     for did, dataset in enumerate(datasets):
         print(f'===== Data {dataset} =====')
         data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
@@ -154,14 +169,14 @@ def plot_pipeline():
             save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph, sedr=True)
 
         plot_clustering(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)
-        # plot_pseudotime(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)
+        plot_pseudotime(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)
 
 def basic_pipeline():
     params = get_params()
     args.dataset_dir = f'../../data'
     args.output_dir = f'../../output'
     max_cells = 8000
-    datasets = ["slideseq_v2", "seqfish_mouse", "stereo_seq"]
+    datasets = ["slideseq_v2", "seqfish_mouse"]#,"stereo_seq"
     n_neighbors = [15, 15, 15]
     resolutions = [1.0, 0.8, 0.8]
     for did, dataset in enumerate(datasets):
@@ -208,7 +223,8 @@ def basic_pipeline():
 
         sc.pp.neighbors(adata, n_neighbors=n_neighbors[did])
         sc.tl.umap(adata)
-        sc.tl.leiden(adata, resolution=resolutions[did])
+        resolution = res_search_fixed_clus("leiden", adata,8) if dataset == "stereo_seq" else resolutions[did]
+        sc.tl.leiden(adata, resolution=resolution)
         sc.tl.paga(adata)
         df_meta = pd.DataFrame(np.array(adata.obs['leiden']))
         df_meta.to_csv(f'{params.save_path}/leiden.tsv', sep='\t', header=False, index=False)

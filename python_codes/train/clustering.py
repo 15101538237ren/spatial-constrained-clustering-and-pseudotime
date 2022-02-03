@@ -27,8 +27,7 @@ def leiden(adata, resolution=.6):
     labels = adata.obs["leiden"].cat.codes
     return labels
 
-def louvain(adata, ncluster=7):
-    resolution = res_search_fixed_clus(adata, ncluster)
+def louvain(adata, resolution=.6):
     sc.tl.louvain(adata, resolution=float(resolution))
     labels = adata.obs["louvain"].cat.codes
     return labels
@@ -45,19 +44,18 @@ def clustering(args, dataset, sample_name, method = "leiden", n_neighbors=50, re
 
     if os.path.exists(feature_fp):
         adata_feat = sc.read_csv(feature_fp, delimiter="\t", first_column_names=None)
-
         sc.pp.neighbors(adata_feat, n_neighbors=n_neighbors, use_rep='X')
         if dataset == "DLPFC":
             n_clusters = 5 if sample_name in ['151669', '151670', '151671', '151672'] else 6
             if method == "kmeans":
                 labels = kmeans(adata_feat, n_clusters)
             else:
+                resolution = res_search_fixed_clus(adata_feat, n_clusters)
 
                 if method =="leiden":
-                    resolution = res_search_fixed_clus(adata_feat, n_clusters)
                     labels = leiden(adata_feat, resolution)
                 else:
-                    labels = louvain(adata_feat)
+                    labels = louvain(adata_feat, resolution)
         else:
             labels = leiden(adata_feat, resolution)
         np.savetxt(cluster_fp, labels, fmt='%d', header='', footer='', comments='')

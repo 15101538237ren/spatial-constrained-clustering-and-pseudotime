@@ -3,7 +3,7 @@ import argparse
 parser = argparse.ArgumentParser()
 
 # params to change
-parser.add_argument('--gpu', type=int, default=0)
+parser.add_argument('--gpu', type=int, default=5)
 parser.add_argument('--arch', type=str, default='DGI')
 parser.add_argument('--spatial', type=bool, default=False)
 parser.add_argument('--n_neighbors_for_knn_graph', type=int, default=5)

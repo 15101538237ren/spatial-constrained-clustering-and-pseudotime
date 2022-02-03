@@ -7,6 +7,7 @@ import pandas as pd
 import seaborn as sns
 from scipy.spatial.distance import cdist
 from scipy.spatial import distance_matrix
+from scipy.stats import pearsonr
 from sklearn.decomposition import PCA
 #from python_codes.train.train import train
 from python_codes.train.clustering import clustering
@@ -298,6 +299,25 @@ def cell_cell_communication_preprocessing_data(args, adata):
     return adata, genes, cells
 
 
+def calc_pseudotime_corr_genes(args, adatas, dataset, n_top=16):
+    original_spatial = args.spatial
+    args.spatial = True
+    samples = ['D4', 'D7', 'D10', 'D14']
+    genes_lists = []
+    for sid, sample in enumerate(samples):
+        output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample)}'
+        pseudotimes = pd.read_csv(f"{output_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
+        adata, _ = preprocessing_data(args, adatas[sid])
+        expr = np.asarray(adata.X.todense())
+        genes = np.array(adata.var_names)
+        gene_corrs = [[gene] + list(pearsonr(expr[:, gix].flatten(), pseudotimes)) for gix, gene in enumerate(genes)]
+        gene_corrs.sort(key=lambda k:k[-1])
+        df = pd.DataFrame(gene_corrs, columns=["gene", "corr", "p-val"])
+        df.to_csv(f"{output_dir}/Gene_Corr_with_PST.tsv", index=False)
+        args.spatial = original_spatial
+        genes_lists.append(df.values[:n_top, 0].astype(str))
+    return genes_lists
+
 def save_background_genes(args, adata, sample_name, dataset="chicken"):
     genes = adata.var_names.astype(str)
     args.spatial = True
@@ -512,12 +532,15 @@ def plot_annotated_clusters(args, adatas, sample_name="merged", dataset="chicken
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
-def plot_expr_in_ST(args, adatas, gene_name, sample_name = "merged", dataset="chicken", scatter_sz= 6., cm = plt.get_cmap("RdPu")):
+def plot_expr_in_ST(args, adatas, gene_name, sample_name = "merged", dataset="chicken", scatter_sz= 6., cm = plt.get_cmap("RdPu"), subdir=None):
     args.spatial = True
-    output_dir = f'{args.output_dir}/{dataset}/{sample_name}/expr_in_ST'
+    output_dir = f'{args.output_dir}/{dataset}/{sample_name}/expr_in_ST' if not subdir else f'{args.output_dir}/{dataset}/{sample_name}/expr_in_ST/{subdir}'
     mkdir(output_dir)
     samples = ['D4', 'D7', 'D10', 'D14']
     fig, axs = figure(2, 2, rsz=2.2, csz=3., wspace=.2, hspace=.2)
+    for sid in range(len(adatas)):
+        if gene_name not in adatas[sid].var_names:
+            return
     exprs = [np.asarray(adatas[sid][:, adatas[sid].var_names == gene_name].X.todense()).flatten() for sid, sample in enumerate(samples)]
     max_exprs = [np.max(expr)for expr in exprs]
     max_expr = max(max_exprs) * .6
@@ -856,47 +879,74 @@ def plot_lineage_pseudotime(args, adatas, annotations_list, lineage, lineage_ada
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
+def plot_pseudo_spatial_temporal_map(args, adatas, sample_name="merged", dataset="chicken", scatter_sz=4, cm = plt.get_cmap("gist_rainbow")):
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{dataset}/{sample_name}'
+    mkdir(output_dir)
+    samples = ['D4', 'D7', 'D10', 'D14']
+    fig, axs = figure(1, len(samples), rsz=2.8, csz=4.8, wspace=.5, hspace=.4)
+    box_ratios = [.8, .8, .9, .7]
+    for sid, sample in enumerate(samples):
+        ax = axs[sid]
+        ax.axis('off')
+        coord = adatas[sid].obsm['spatial'].astype(float)
+        x, y = coord[:, 0], coord[:, 1]
+        pst_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample)}'
+        pseudotimes = pd.read_csv(f"{pst_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
+        st = ax.scatter(x, y, s=scatter_sz, c=pseudotimes, cmap=cm)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        clb = fig.colorbar(st, cax=cax)
+        clb.ax.set_ylabel("PST score", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        ax.set_title(sample, fontsize=title_sz)
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * box_ratios[sid], box.height])
+    fig_fp = f"{output_dir}/pseudo_spatial_temporal_maps.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
+
 ####################################
 #-------------Pipelines------------#
 ####################################
 
 def basic_pipeline(args):
-    sample_list = ['D4', 'D7', 'D10', 'D14']
+    sample_list = ['D4', 'D7', 'D10', 'D14'] #
 
     for sample_name in sample_list:
-        cell_types, region_annos = get_annotations_chicken(args, sample_name)
         adata = load_chicken_data(args, sample_name)
-        train_pipeline(args, adata, sample_name, cell_types)
+        train_pipeline(args, adata, sample_name, isTrain=True)
         plot_clustering(args, sample_name)
-        # plot_pseudotime(args, sample_name)
-        # plot_phate(args, sample_name, adata_filtered.X, anno_clusters)
-        #adata_filtered.obs["bulk_labels"] = pd.Categorical(anno_clusters)
-        pred_clusters = get_clusters(args, sample_name)
-        plot_rank_marker_genes_group(args, sample_name, adata_filtered, pred_clusters)
+        plot_pseudotime(args, sample_name)
+        # # plot_phate(args, sample_name, adata_filtered.X, anno_clusters)
+        # adata_filtered.obs["bulk_labels"] = pd.Categorical(anno_clusters)
+        # pred_clusters = get_clusters(args, sample_name)
+        # plot_rank_marker_genes_group(args, sample_name, adata_filtered, pred_clusters)
 
 def annotation_pipeline(args):
     sample_list = ['D4', 'D7', 'D10', 'D14']
     adatas, cell_type_annotations_list, region_annotations_list = [], [], []
     for sample_name in sample_list:
-        anno_clusters, region_annos = get_annotations_chicken(args, sample_name)
-        cell_type_annotations_list.append(anno_clusters)
-        region_annotations_list.append(region_annos)
+        # anno_clusters, region_annos = get_annotations_chicken(args, sample_name)
+        # cell_type_annotations_list.append(anno_clusters)
+        # region_annotations_list.append(region_annos)
         adata = load_chicken_data(args, sample_name)
         adatas.append(adata)
     # plot_annotated_cell_types(args, adatas, cell_type_annotations_list)
     # plot_annotated_cell_regions(args, adatas, region_annotations_list)
-    plot_annotated_clusters(args, adatas)
+    #plot_annotated_clusters(args, adatas)
+    plot_pseudo_spatial_temporal_map(args, adatas)
 
-def train_pipeline(args, adata, sample_name, cell_types, dataset="chicken", clustering_method="leiden", resolution = .8, n_neighbors = 10, isTrain=True):
+def train_pipeline(args, adata, sample_name, dataset="chicken", clustering_method="leiden", resolution = .8, n_neighbors = 10, isTrain=True):
     adata_filtered, spatial_graph = preprocessing_data(args, adata)
     if isTrain:
-        for spatial in [True]:
+        for spatial in [False, True]:
             args.spatial = spatial
-            embedding = train(args, adata_filtered, spatial_graph)
-            save_features(args, embedding, dataset, sample_name)
+            #embedding = train(args, adata_filtered, spatial_graph)
+            #save_features(args, embedding, dataset, sample_name)
             clustering(args, dataset, sample_name, clustering_method, n_neighbors=n_neighbors, resolution=resolution)
-            pseudotime(args, dataset, sample_name, root_cell_type="Epi-epithelial cells", cell_types=cell_types, n_neighbors=n_neighbors, resolution=resolution)
-    return adata_filtered, genes, cells
+            pseudotime(args, dataset, sample_name, n_neighbors=n_neighbors, resolution=resolution)
+    return adata_filtered
 
 def hiearchical_clustering_heatmap(args, data, lineage_name, annotation_types, annotations_arr, annotation_color_dict_arr, annotation_colors_arr, dataset="chicken"):
     output_dir = f'{args.output_dir}/{dataset}/{lineage_name}'
@@ -1017,7 +1067,7 @@ def lineage_pipeline(args, all_lineage=False):
         filtered_adatas, filtered_annotations, filtered_cell_types, filtered_regions, filtered_days = filter_adatas_annotations_chicken(adatas, cluster_annotations, cell_types, regions, days, lineages)
         merged_adata, merged_cluster_annotations, merged_cell_types, merged_regions, merged_days = merge_adatas_annotations_chicken(filtered_adatas, filtered_annotations, filtered_cell_types, filtered_regions, filtered_days)
         # plot_lineage_annotated_clusters(args, adatas, filtered_adatas, lineage_name)
-    adata_filtered, genes, cells = train_pipeline(args, merged_adata, lineage_name, merged_cell_types, resolution=.4, isTrain=False)
+    adata_filtered = train_pipeline(args, merged_adata, lineage_name, resolution=.4, isTrain=False)
 
     # plot_lineage_expr_tsne(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name, scatter_sz= 1)
     # plot_lineage_embedding_tsne(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
@@ -1040,6 +1090,17 @@ def expr_analysis_pipeline(args):
     target_genes = ["BAMBI"]#, "CNMD", "COL1A1", "S100A6", "S100A11", "TXNDC5"]#["ACADSB", "ACBD7", "ACTA2", "ACTG2", "AKR1D1", "APOA1", "APP", "ATP6V1E1", "BAMBI", "BMP10", "BRD2", "C1H2ORF40", "C5H11orf58", "CA9", "CAV3", "CCDC80", "CD36", "CHGB", "CHODL", "CIAO2B", "CNMD", "COL14A1", "COL1A1", "COL4A1", "COL5A1", "COX17", "CPE", "CRIP1", "CSRP2", "CSTA", "CTGF", "CTSA", "DERA", "DPYSL3", "DRAXIN", "EDNRA", "ENSGALG00000004518", "ENSGALG00000013239", "ENSGALG00000015349", "ENSGALG00000020788", "ENSGALG00000028551", "ENSGALG00000040263", "ENSGALG00000050984", "ENSGALG00000053871", "FABP3", "FABP5", "FABP7", "FBLN1", "FGFR3", "FHL1", "FHL2", "FMC1", "FSTL1", "FXYD6", "GJA5", "GKN2", "GLRX5", "GPC1", "GPX3", "HADHB", "HAPLN3", "HBBR-1", "HPGD", "ID2", "ID4", "IRX4", "KRT18", "LBH", "LDHA", "LMOD2", "LSP1", "LTBP2", "LUM", "MAD2L2", "MAPK6", "MAPRE1", "MB"] + ["MFAP2", "MGP", "MOXD1", "MSX1", "MT4L", "MTFP1", "MUSTN1", "MYH1D", "MYH1F", "MYH7", "MYL1", "MYLK", "MYOM1", "MYOM2", "MYOZ2", "NIPSNAP2", "NPC2", "NRN1L", "OSTN", "OXCT1", "PECAM1", "PENK", "PERP2", "PGAP2", "PITX2", "PLN", "POSTN", "PRNP", "PRRX1", "RAMP2", "RARRES1", "RCSD1", "RD3L", "RRAD", "RSRP1", "S100A11", "S100A6", "SEC63", "SERPINE2", "SESTD1", "SFRP1", "SFRP2", "SLN", "SMAD6", "SYPL1", "TBX5", "TESC", "TFPI2", "THBS4", "TIMM9", "TMEM158", "TMEM163", "TNIP1", "TNNC2", "TPM1", "TUBAL3", "TXNDC5", "VCAN", "Wpkci-7"]#"BAMBI"
     for gene in target_genes:
         plot_expr_in_ST(args, adatas, gene, scatter_sz=1)
+
+
+def corr_expr_analysis_pipeline(args):
+    sample_list = ['D4', 'D7', 'D10', 'D14']
+    adatas = [load_chicken_data(args, sample) for sample in sample_list]
+    genes_corred = calc_pseudotime_corr_genes(args, adatas, "chicken")
+    for sid, sample in enumerate(sample_list):
+        subdir = f"{sample}_Genes_Corr_wt_PST"
+        genes = genes_corred[sid]
+        for gene in genes:
+            plot_expr_in_ST(args, adatas, gene, scatter_sz=1, subdir=subdir)
 
 
 

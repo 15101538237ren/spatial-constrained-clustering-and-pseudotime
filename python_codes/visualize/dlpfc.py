@@ -1,8 +1,10 @@
 # -*- coding:utf-8 -*-
 import math
-import anndata
+from colour import Color
 from scipy.spatial import distance_matrix
+from scipy.stats import pearsonr
 from python_codes.util.util import *
+from matplotlib.colors import to_hex
 from matplotlib import rcParams
 rcParams['font.family'] = 'sans-serif'
 rcParams['font.sans-serif'] = ['Arial','Roboto']
@@ -10,7 +12,10 @@ rcParams['savefig.dpi'] = 300
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable, inset_locator
+from python_codes.util.exchangeable_loom import write_exchangeable_loom
 title_sz = 16
+
+
 def plt_setting():
     SMALL_SIZE = 10
     MEDIUM_SIZE = 12
@@ -143,6 +148,7 @@ def plot_clustering_comparison(args, sample_name, method="leiden", dataset="DLPF
             color = cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
             ind = pred_clusters == cluster
             ax.scatter(x[ind], y[ind], s=scatter_sz, color=color, label=cluster)
+        title = "SpaceFlow" if spatial else title
         ax.set_title(title, fontsize=title_sz, pad=-20)
         if sid:
             box = ax.get_position()
@@ -176,9 +182,24 @@ def plot_pseudotime(args, sample_name, dataset="DLPFC", HnE=False, cm = plt.get_
     plt.close('all')
     args.spatial = original_spatial
 
+def calc_pseudotime_corr_genes(args, sample_name, dataset="DLPFC", n_top=28):
+    original_spatial = args.spatial
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    pseudotimes = pd.read_csv(f"{output_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
+    adata = load_DLPFC_data(args, sample_name, v2=False)
+    adata, _ = preprocessing_data(args, adata)
+    expr = np.asarray(adata.X.todense())
+    genes = np.array(adata.var_names)
+    gene_corrs = [[gene] + list(pearsonr(expr[:, gix].flatten(), pseudotimes)) for gix, gene in enumerate(genes)]
+    gene_corrs.sort(key=lambda k:k[-1])
+    df = pd.DataFrame(gene_corrs, columns=["gene", "corr", "p-val"])
+    df.to_csv(f"{output_dir}/Gene_Corr_with_PST.tsv", index=False)
+    args.spatial = original_spatial
+    return df.values[:n_top, 0].astype(str)
 def plot_pseudotime_comparison(args, sample_name, dataset="DLPFC", cm = plt.get_cmap("gist_rainbow"), scale = 0.045, n_neighbors=50, root_cell_type = None, cell_types=None):
-    methods = ["Seurat", "stLearn", "DGI", "DGI_SP"]
-    files = ["seurat.PCs.tsv", "PCs.tsv", "features.tsv", "features.tsv"]
+    methods = ["monocole", "slingshot", "Seurat", "stLearn", "DGI", "DGI_SP"]
+    files = [None, None, "seurat.PCs.tsv", "PCs.tsv", "features.tsv", "features.tsv"]
     nrow, ncol = 1, len(methods)
 
     data_root = f'{args.dataset_dir}/{dataset}/{sample_name}'
@@ -235,8 +256,9 @@ def plot_pseudotime_comparison(args, sample_name, dataset="DLPFC", cm = plt.get_
             clb = fig.colorbar(st, cax=axins)
             clb.set_ticks([0.0, 1.0])
             clb.set_ticklabels(["0", "1"])
-            clb.ax.set_ylabel("pseudotime", labelpad=10, rotation=270, fontsize=10, weight='bold')
-        ax.set_title(method.replace("_", " + "), fontsize=title_sz)
+            clb.ax.set_ylabel("PST Score", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        method = "SpaceFlow" if mid == len(methods) - 1 else method
+        ax.set_title(method.replace("_", " + "), fontsize=title_sz, pad=-10)
     fig_fp = f"{output_dir}/psudotime_comparison.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
@@ -292,12 +314,75 @@ def plot_umap_comparison(args, sample_name, dataset="DLPFC", n_neighbors=50):
     plt.close('all')
 
 
+def plot_umap_comparison_with_coord_alpha(args, sample_name, dataset="DLPFC", n_neighbors=50):
+    methods = ["Seurat",  "stLearn", "DGI", "DGI_SP"]
+    files = ["seurat.PCs.tsv", "PCs.tsv", "features.tsv", "features.tsv"]
+    nrow, ncol = 1, len(methods)
+    adata_origin = load_DLPFC_data(args, sample_name, v2=False)
+    coord = adata_origin.obsm['spatial'].astype(float)
+    x, y = coord[:, 0], coord[:, 1]
+    normed_x = (x - np.min(x))/(np.max(x) - np.min(x))
+    normed_y = (y - np.min(y))/(np.max(y) - np.min(y))
+    normed_c = np.sqrt(normed_x**2 + normed_y**2)
+    normed_c = (normed_c - np.min(normed_c))/(np.max(normed_c) - np.min(normed_c))
+    data_root = f'{args.dataset_dir}/{dataset}/{sample_name}'
+    fig, axs = figure(nrow, ncol, rsz=3, csz=3.6, wspace=.3, hspace=.3)
+    for ax in axs:
+        ax.axis('off')
+
+    for mid, method in enumerate(methods):
+        print(f"Processing {sample_name} {method}")
+        col = mid % ncol
+        ax = axs[col]
+        output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
+        umap_positions_fp = f"{output_dir}/umap_positions.tsv"
+        if not os.path.exists(umap_positions_fp):
+            file_name = files[mid]
+            feature_fp = f'{output_dir}/{file_name}'
+            if file_name.endswith("npz"):
+                obj = np.load(feature_fp)
+                adata = anndata.AnnData(obj.f.sedr_feat)
+            else:
+                adata = sc.read_csv(feature_fp, delimiter="\t")
+            sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
+            sc.tl.umap(adata)
+            umap_positions = adata.obsm["X_umap"]
+            np.savetxt(umap_positions_fp, umap_positions, fmt='%.5f\t%.5f', header='', footer='', comments='')
+        else:
+            umap_positions = pd.read_csv(umap_positions_fp, header=None, sep="\t").values.astype(float)
+        df_meta = pd.read_csv(f'{data_root}/metadata.tsv', sep='\t')
+        annotations = df_meta['layer_guess'].values.astype(str)
+        cluster_names = list(np.unique(annotations))
+
+        cm = plt.get_cmap("tab10")
+        for cid, cluster in enumerate(cluster_names[:-1]):
+            ind = annotations == cluster
+            umap_sub = umap_positions[ind]
+            alphas = normed_c[ind]
+            color = to_hex(cm(1. * cid / (len(cluster_names) + 1)))
+            color_gradients = linear_gradient(color, n=6)["hex"]
+            n = umap_sub.shape[0]
+            colors = np.array([color_gradients[int(alphas[i] // 0.2) + 1] for i in range(n)])
+            ax.scatter(umap_sub[:, 0], umap_sub[:, 1], s=1, color=colors, label=cluster)
+        if mid == len(methods) - 1:
+            box = ax.get_position()
+            height_ratio = 1.0
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
+            ax.legend(loc='center left', fontsize='x-small', bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.05,
+                      borderaxespad=.1)
+        method = "SpaceFlow" if method == "DGI_SP" else method
+        ax.set_title(method.replace("_", " + "), fontsize=title_sz, pad=10)
+    fig_fp = f"{output_dir}/umap_comparison-calpha.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
+
 def rank_marker_genes_group(args, sample_name, method="leiden", dataset="DLPFC"):
     original_spatial = args.spatial
     args.spatial = True
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     adata = load_DLPFC_data(args, sample_name, v2=False)
-    adata_filtered, _, _, _, _, _ = preprocessing_data(args, adata)
+    adata_filtered, _ = preprocessing_data(args, adata)
     pred_clusters = pd.read_csv(f"{output_dir}/{method}.tsv", header=None).values.flatten().astype(str)
     adata_filtered.obs["leiden"] = pd.Categorical(pred_clusters)
     sc.tl.rank_genes_groups(adata_filtered, 'leiden', method='wilcoxon')
@@ -319,7 +404,30 @@ def rank_marker_genes_group(args, sample_name, method="leiden", dataset="DLPFC")
     gene_back_ground_fp = f"{output_dir}/gene_back_ground.txt"
     write_list_to_file(gene_back_ground_fp, gene_back_ground)
 
-def plot_marker_gene_expression(args, sample_name, gene_names, dataset="DLPFC", ncol = 4, scale = 0.045, cm = plt.get_cmap("plasma")):
+def export_pca_and_cluster_pipeline_for_slingshot(args, dataset = "DLPFC", sample_name="151671"):
+    dataset_dir = f"{args.dataset_dir}/{dataset}/{sample_name}"
+    adata = load_DLPFC_data(args, sample_name, v2=False)
+    adata_filtered, _, = preprocessing_data(args, adata)
+
+    sc.pp.neighbors(adata_filtered, n_neighbors=15)
+    sc.tl.leiden(adata_filtered, resolution=.45)
+
+    output_dir = f'{dataset_dir}/export'
+    mkdir(output_dir)
+
+    write_exchangeable_loom(adata_filtered, f'{output_dir}/adata_filtered.loom')
+
+    pcs = np.array(adata_filtered.obsm["X_pca"])
+    df_pcs = pd.DataFrame(pcs)
+    df_pcs.to_csv(f'{output_dir}/pcs.tsv', sep='\t', index=False)
+
+    df_cluster = pd.DataFrame(np.array(adata_filtered.obs["leiden"]), columns=["leiden_label"])
+    df_cluster.to_csv(f'{output_dir}/leiden.tsv', sep='\t', index=False)
+
+    print(f'===== Exported {dataset} =====')
+
+
+def plot_marker_gene_expression(args, sample_name, gene_names, dataset="DLPFC", ncol = 5, scale = 0.045, cm = plt.get_cmap("magma"), isCorrGene=False):
     original_spatial = args.spatial
     args.spatial = True
     nrow = int(math.ceil(len(gene_names)/float(ncol)))
@@ -328,29 +436,30 @@ def plot_marker_gene_expression(args, sample_name, gene_names, dataset="DLPFC", 
     coord = adata.obsm['spatial'].astype(float) * scale
     x, y = coord[:, 0], coord[:, 1]
     adata_filtered, _ = preprocessing_data(args, adata)
-    genes = np.array(adata_filtered.var_names)
+    genes = np.char.upper(np.array(adata_filtered.var_names).astype(str)) if not isCorrGene else np.array(adata_filtered.var_names).astype(str)
     expr = np.asarray(adata.X.todense())
     fig, axs = figure(nrow, ncol, rsz=2.5, csz=2.6, wspace=.2, hspace=.2)
     xlimits = [130, 550]
     ylimits = [100, 530]
     for gid, gene in enumerate(gene_names):
-        row = gid // ncol
-        col = gid % ncol
-        ax = axs[row][col] if nrow > 1 else axs[col]
-        ax.axis('off')
-        ax.set_xlim(xlimits)
-        ax.set_ylim(ylimits)
-        ax.invert_yaxis()
-        ax.set_title(gene)
-        gene_expr = expr[:, genes == gene].flatten()
-        gene_expr /= np.max(gene_expr)
-        st = ax.scatter(x, y, s=1.3, c=gene_expr, cmap=cm)
-        ax.set_title(gene, fontsize=14, pad=-30)
-        if col == (ncol - 1):
-            axins = inset_locator.inset_axes(ax, width="7%", height="50%",  loc='lower left', bbox_to_anchor=(1.05, 0.1, 1, 1), bbox_transform=ax.transAxes, borderpad=0)
-            clb = fig.colorbar(st, cax=axins)
-            clb.set_ticks([0.0, 1.0])
-            clb.set_ticklabels(["Min", "Max"])
+        if gene in genes:
+            row = gid // ncol
+            col = gid % ncol
+            ax = axs[row][col] if nrow > 1 else axs[col]
+            ax.axis('off')
+            ax.set_xlim(xlimits)
+            ax.set_ylim(ylimits)
+            ax.invert_yaxis()
+            ax.set_title(gene)
+            gene_expr = expr[:, genes == gene].flatten()
+            gene_expr /= np.max(gene_expr)
+            st = ax.scatter(x, y, s=1.3, c=gene_expr, cmap=cm)
+            ax.set_title(gene, fontsize=14, pad=-30)
+            if col == (ncol - 1):
+                axins = inset_locator.inset_axes(ax, width="7%", height="50%",  loc='lower left', bbox_to_anchor=(1.05, 0.1, 1, 1), bbox_transform=ax.transAxes, borderpad=0)
+                clb = fig.colorbar(st, cax=axins)
+                clb.set_ticks([0.0, 1.0])
+                clb.set_ticklabels(["Min", "Max"])
 
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     fig_fp = f"{output_dir}/marker_gene_expr.pdf"

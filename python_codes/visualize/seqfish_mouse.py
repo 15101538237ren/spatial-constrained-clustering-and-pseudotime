@@ -10,6 +10,7 @@ from python_codes.train.pseudotime import pseudotime
 warnings.filterwarnings("ignore")
 from scipy.sparse import csr_matrix
 from python_codes.util.util import *
+from matplotlib.colors import to_hex
 from matplotlib import rcParams
 rcParams['font.family'] = 'sans-serif'
 rcParams['font.sans-serif'] = ['Arial','Roboto']
@@ -175,6 +176,76 @@ def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
+def plot_umap_comparison_with_coord_alpha(args, sample_name, dataset, n_neighbors=15):
+    methods = ["scanpy",  "Seurat", "DGI", "DGI_SP"]
+    files = ["PCA.tsv", "seurat.PCs.tsv", "features.tsv", "features.tsv"]
+    nrow, ncol = 1, len(methods)
+
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
+    if os.path.exists(f"{data_root}/adata.h5ad"):
+        adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
+    else:
+        adata = load_stereo_seq_data(args)
+        adata_filtered, spatial_graph = preprocessing_data(args, adata)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+
+    coord = adata_filtered.obsm['spatial'].astype(float)
+    x, y = coord[:, 0], coord[:, 1]
+    normed_x = (x - np.min(x))/(np.max(x) - np.min(x))
+    normed_y = (y - np.min(y))/(np.max(y) - np.min(y))
+    normed_c = np.sqrt(normed_x**2 + normed_y**2)
+    normed_c = (normed_c - np.min(normed_c))/(np.max(normed_c) - np.min(normed_c))
+
+    data_root = f'{args.dataset_dir}/{dataset}/{sample_name}'
+    fig, axs = figure(nrow, ncol, rsz=5.5, csz=6., wspace=.1, hspace=.1, left=.05, right=.95)
+    for ax in axs:
+        ax.axis('off')
+
+    for mid, method in enumerate(methods):
+        print(f"Processing {sample_name} {method}")
+        col = mid % ncol
+        ax = axs[col]
+        output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
+        umap_positions_fp = f"{output_dir}/umap_positions.tsv"
+        if not os.path.exists(umap_positions_fp):
+            file_name = files[mid]
+            feature_fp = f'{output_dir}/{file_name}'
+            adata = sc.read_csv(feature_fp, delimiter="\t")
+            sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
+            sc.tl.umap(adata)
+            umap_positions = adata.obsm["X_umap"]
+            np.savetxt(umap_positions_fp, umap_positions, fmt='%.5f\t%.5f', header='', footer='', comments='')
+        else:
+            umap_positions = pd.read_csv(umap_positions_fp, header=None, sep="\t").values.astype(float)
+
+        if method != "Seurat":
+            pred_clusters = pd.read_csv(f"{output_dir}/leiden.tsv", header=None).values.flatten().astype(int)
+        else:
+            pred_clusters = pd.read_csv(f"{output_dir}/metadata.tsv", sep="\t")["seurat_clusters"].values.flatten().astype(int)
+        cluster_names = list(np.unique(pred_clusters))
+        n_cluster = len(cluster_names)
+        cm = plt.get_cmap("tab20")
+        for cid, cluster in enumerate(cluster_names):
+            ind = pred_clusters == cluster
+            umap_sub = umap_positions[ind]
+            alphas = normed_c[ind]
+            color = to_hex(cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster))
+            color_gradients = linear_gradient(color, n=6)["hex"]
+            n = umap_sub.shape[0]
+            colors = np.array([color_gradients[int(alphas[i] // 0.2) + 1] for i in range(n)])
+            ax.scatter(umap_sub[:, 0], umap_sub[:, 1], s=1, color=colors, label=cluster)
+        if mid == len(methods) - 1:
+            box = ax.get_position()
+            height_ratio = 1.0
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
+            ax.legend(loc='center left', fontsize='x-small', bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.05,
+                      borderaxespad=.1)
+        ax.set_title(method.replace("_", " + "), fontsize=title_sz)
+    fig_fp = f"{output_dir}/umap_comparison-calpha.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
+
 def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, method="cluster", top_n_genes=3):
     original_spatial = args.spatial
     args.spatial = True
@@ -252,8 +323,9 @@ def basic_pipeline(args):
         save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
 
     # train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=30, isTrain=False)
-    plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
+    #plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
     # plot_pseudotime(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
+    plot_umap_comparison_with_coord_alpha(args, dataset, dataset)
 
 def expr_analysis_pipeline(args):
     dataset = "seqfish_mouse"

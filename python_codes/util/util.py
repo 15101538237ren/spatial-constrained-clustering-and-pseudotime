@@ -38,6 +38,7 @@ def load_ST_file(file_fold, count_file='filtered_feature_bc_matrix.h5', load_ima
         adata_h5.obsm['spatial'] = adata_h5.obs[['pxl_row_in_fullres', 'pxl_col_in_fullres']].to_numpy()
         adata_h5.obs.drop(columns=['barcode', 'pxl_row_in_fullres', 'pxl_col_in_fullres'], inplace=True)
         print('adata: (' + str(adata_h5.shape[0]) + ', ' + str(adata_h5.shape[1]) + ')')
+    sc.pp.filter_genes(adata_h5, min_cells=3)
     return adata_h5
 
 
@@ -46,6 +47,7 @@ def load_DLPFC_data(args, sample_name, v2=True):
         file_fold = f'{args.dataset_dir}/DLPFC_v2/{sample_name}'
         adata = sc.read_10x_mtx(file_fold)
         adata.obsm['spatial'] = pd.read_csv(f"{file_fold}/spatial_coords.csv").values.astype(float)
+        sc.pp.filter_genes(adata, min_cells=3)
     else:
         file_fold = f'{args.dataset_dir}/DLPFC/{sample_name}'
         adata = load_ST_file(file_fold=file_fold)
@@ -53,10 +55,12 @@ def load_DLPFC_data(args, sample_name, v2=True):
 
 def load_slideseqv2_data():
     adata = sq.datasets.slideseqv2()
+    sc.pp.filter_genes(adata, min_cells=3)
     return adata
 
 def load_seqfish_mouse_data():
     adata = sq.datasets.seqfish()
+    sc.pp.filter_genes(adata, min_cells=3)
     return adata
 
 def load_stereo_seq_data(args):
@@ -65,6 +69,8 @@ def load_stereo_seq_data(args):
     coords = pd.read_csv(f"{file_fold}/position.tsv", delimiter='\t').values.astype(float)
     adata = adata.transpose()[:, 1:]
     adata.obsm["spatial"] = coords[:, :2]
+    sc.pp.filter_cells(adata, min_genes=100)
+    sc.pp.filter_genes(adata, min_cells=3)
     return adata
 
 def load_datasets(args, dataset):
@@ -113,12 +119,10 @@ def save_preprocessed_data(args, dataset, sample_name, adata, spatial_graph, sed
     print(f"Saved Preprocessed Data of {dataset}!")
 
 def preprocessing_data(args, adata, n_top_genes=None):
-    sc.pp.filter_genes(adata, min_counts=1)  # only consider genes with more than 1 count
-    sc.pp.normalize_per_cell(adata, key_n_counts='n_counts_all', min_counts=0)  # normalize with total UMI count per cell
-    sc.pp.filter_genes_dispersion(adata, flavor='cell_ranger',log=False, subset=True, n_top_genes=n_top_genes)
-    sc.pp.normalize_per_cell(adata, min_counts=0)  # renormalize after filtering
-    sc.pp.log1p(adata)  # log transform: adata.X = log(adata.X + 1)
-    sc.pp.pca(adata)  # log transform: adata.X = log(adata.X + 1)
+    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.log1p(adata)
+    sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes, flavor='cell_ranger', subset=True)
+    sc.pp.pca(adata)
     coords = adata.obsm['spatial']
     cut = estimate_cutoff_knn(coords, k=args.n_neighbors_for_knn_graph)
     spatial_graph = graph_alpha(coords, cut=cut, n_layer=args.alpha_n_layer)
@@ -191,3 +195,50 @@ def save_features(args, reduced_reprs, dataset, sample_name):
     feature_fp = os.path.join(output_dir, f"features.tsv")
     np.savetxt(feature_fp, reduced_reprs[:, :], delimiter="\t")
     print(f"features saved successful at {feature_fp}")
+
+#### Color Util ####
+
+def hex_to_RGB(hex):
+  ''' "#FFFFFF" -> [255,255,255] '''
+  # Pass 16 to the integer function for change of base
+  return [int(hex[i:i+2], 16) for i in range(1,6,2)]
+
+
+def RGB_to_hex(RGB):
+  ''' [255,255,255] -> "#FFFFFF" '''
+  # Components need to be integers for hex to make sense
+  RGB = [int(x) for x in RGB]
+  return "#"+"".join(["0{0:x}".format(v) if v < 16 else
+            "{0:x}".format(v) for v in RGB])
+
+def color_dict(gradient):
+  ''' Takes in a list of RGB sub-lists and returns dictionary of
+    colors in RGB and hex form for use in a graphing function
+    defined later on '''
+  return {"hex":[RGB_to_hex(RGB) for RGB in gradient],
+      "r":[RGB[0] for RGB in gradient],
+      "g":[RGB[1] for RGB in gradient],
+      "b":[RGB[2] for RGB in gradient]}
+
+
+def linear_gradient(finish_hex, start_hex="#FFFFFF", n=10):
+  ''' returns a gradient list of (n) colors between
+    two hex colors. start_hex and finish_hex
+    should be the full six-digit color string,
+    inlcuding the number sign ("#FFFFFF") '''
+  # Starting and ending colors in RGB form
+  s = hex_to_RGB(start_hex)
+  f = hex_to_RGB(finish_hex)
+  # Initilize a list of the output colors with the starting color
+  RGB_list = [s]
+  # Calcuate a color at each evenly spaced value of t from 1 to n
+  for t in range(1, n):
+    # Interpolate RGB vector for color at the current value of t
+    curr_vector = [
+      int(s[j] + (float(t)/(n-1))*(f[j]-s[j]))
+      for j in range(3)
+    ]
+    # Add it to our list of output colors
+    RGB_list.append(curr_vector)
+
+  return color_dict(RGB_list)

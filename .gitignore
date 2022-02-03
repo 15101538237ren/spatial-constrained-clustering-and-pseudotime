@@ -2,8 +2,13 @@
 data/
 output/
 .idea/
-figures/
+figures
 python_codes/figures/
+*.pdf
+*.ai
+*.png
+*.csv
+*.tsv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
