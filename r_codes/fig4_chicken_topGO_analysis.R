@@ -9,7 +9,7 @@ library(biomaRt)
 library(Rgraphviz)
 
 output_dir = "../output"
-dataset_name = "chicken"
+dataset_name = "chicken_bk"
 sample_name = "Valve cells_MT-enriched valve cells"
 method_name = "DGI_SP"
 
@@ -71,10 +71,10 @@ all_res_final=all_res_final[order(all_res_final$p.adj),]
 results.table.p= all_res_final[which(all_res_final$weightFisher<0.005),]
 
 #save first top 50 ontolgies sorted by adjusted pvalues
-target_file_name = paste(c("topGO_terms.tsv"), collapse = '')
 
 results.table.p$log10WF=-log10(as.numeric(results.table.p$weightFisher))
 
+target_file_name = paste(c("topGO_terms.tsv"), collapse = '')
 go_term_fp = paste(c(input_dir_fp, target_file_name), collapse = '/')
 write.table(results.table.p, go_term_fp,sep="\t",quote=FALSE,row.names=FALSE)
 
@@ -109,5 +109,5 @@ results.table.p %>%
         legend.key.width= unit(.3, 'cm'))
 
 target_fig_name = paste(c("topGO_terms.svg"), collapse = '')
-ggsave(paste(c(input_dir_fp, target_fig_name), collapse = '/'), width=5.5, height=3, dpi=300)
+ggsave(paste(c(input_dir_fp, target_fig_name), collapse = '/'), width=5.5, height=4, dpi=300)
 

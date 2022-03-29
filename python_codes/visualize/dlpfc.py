@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-import math
+import math, shutil
 from colour import Color
 from scipy.spatial import distance_matrix
 from scipy.stats import pearsonr
@@ -83,7 +83,7 @@ def plot_hne_and_annotation(args, sample_name, dataset="DLPFC", nrow = 1, HnE=Fa
         ax.scatter(x[ind], y[ind], s=scatter_sz, color=color, label=cluster)
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width * 0.9, box.height])
-    lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.1, borderaxespad=.1)
+    lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(.93, 0.5), scatterpoints=1, handletextpad=0.1, borderaxespad=.1)
     for handle in lgnd.legendHandles:
         handle._sizes = [8]
     return fig, axs, x, y, subfig_offset
@@ -110,11 +110,11 @@ def plot_clustering(args, sample_name, method="leiden", dataset="DLPFC", HnE=Fal
     plt.close('all')
     args.spatial = original_spatial
 
-def plot_clustering_comparison(args, sample_name, method="leiden", dataset="DLPFC", HnE=False, cm = plt.get_cmap("plasma"), scale = 0.045, scatter_sz=1.3, nrow = 2, ncol=4):
+def plot_clustering_comparison(args, sample_name, method="leiden", dataset="DLPFC", HnE=False, cm = plt.get_cmap("plasma"), scale = 0.045, scatter_sz=1.3, nrow = 2, ncol=4): #plt.get_cmap("rainbow")
     methods = ["Seurat", "Giotto", "stLearn", "SpaGCN", "BayesSpace"]
     col_names = ["seurat_clusters", "HMRF_cluster", "X_pca_kmeans", "refined_pred", "spatial.cluster"]
     original_spatial = args.spatial
-    fig, axs, x, y, subfig_offset = plot_hne_and_annotation(args, sample_name, HnE=HnE, cm=cm, scale=scale, scatter_sz=scatter_sz, nrow=nrow, ncol=ncol, rsz=2.9, csz=2.9, wspace=.3, hspace=.3)
+    fig, axs, x, y, subfig_offset = plot_hne_and_annotation(args, sample_name, HnE=HnE, cm=cm, scale=scale, scatter_sz=scatter_sz, nrow=nrow, ncol=ncol, rsz=2.7, csz=2.9, wspace=.2, hspace=.3)
     for mid, benchmarking_method in enumerate(methods):
         print(f"Processing {benchmarking_method}")
         real_ind = mid + subfig_offset + 1
@@ -153,7 +153,7 @@ def plot_clustering_comparison(args, sample_name, method="leiden", dataset="DLPF
         if sid:
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width * 0.9, box.height])
-            lgnd = ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=8, scatterpoints=1, handletextpad=0.1, borderaxespad=.1)
+            lgnd = ax.legend(loc='center left', bbox_to_anchor=(.93, 0.5), fontsize=8, scatterpoints=1, handletextpad=0.1,borderaxespad=.1)
             for handle in lgnd.legendHandles:
                 handle._sizes = [8]
     fig_fp = f"{output_dir}/{method}_comparison.pdf"
@@ -197,9 +197,10 @@ def calc_pseudotime_corr_genes(args, sample_name, dataset="DLPFC", n_top=28):
     df.to_csv(f"{output_dir}/Gene_Corr_with_PST.tsv", index=False)
     args.spatial = original_spatial
     return df.values[:n_top, 0].astype(str)
+
 def plot_pseudotime_comparison(args, sample_name, dataset="DLPFC", cm = plt.get_cmap("gist_rainbow"), scale = 0.045, n_neighbors=50, root_cell_type = None, cell_types=None):
-    methods = ["monocole", "slingshot", "Seurat", "stLearn", "DGI", "DGI_SP"]
-    files = [None, None, "seurat.PCs.tsv", "PCs.tsv", "features.tsv", "features.tsv"]
+    methods = ["Seurat", "monocle", "slingshot", "DGI_SP"]#, "stLearn", "DGI"
+    files = ["seurat.PCs.tsv", None, None, "features.tsv"]#, "PCs.tsv", "features.tsv"
     nrow, ncol = 1, len(methods)
 
     data_root = f'{args.dataset_dir}/{dataset}/{sample_name}'
@@ -210,7 +211,7 @@ def plot_pseudotime_comparison(args, sample_name, dataset="DLPFC", cm = plt.get_
     xlimits = [130, 550]
     ylimits = [100, 530]
 
-    fig, axs = figure(nrow, ncol, rsz=2.4, csz=2.8, wspace=.3, hspace=.3)
+    fig, axs = figure(nrow, ncol, rsz=2.4, csz=2.8, wspace=.35, hspace=.3)
     for ax in axs:
         ax.axis('off')
         ax.set_xlim(xlimits)
@@ -251,14 +252,15 @@ def plot_pseudotime_comparison(args, sample_name, dataset="DLPFC", cm = plt.get_
         else:
             pseudotimes = pd.read_csv(pseudotime_fp, header=None).values.flatten().astype(float)
         st = ax.scatter(x, y, s=1, c=pseudotimes, cmap=cm)
-        if col == (ncol - 1):
-            axins = inset_locator.inset_axes(ax, width="5%", height="60%",  loc='lower left', bbox_to_anchor=(1.05, 0.1, 1, 1), bbox_transform=ax.transAxes, borderpad=0)
-            clb = fig.colorbar(st, cax=axins)
-            clb.set_ticks([0.0, 1.0])
-            clb.set_ticklabels(["0", "1"])
-            clb.ax.set_ylabel("PST Score", labelpad=10, rotation=270, fontsize=10, weight='bold')
-        method = "SpaceFlow" if mid == len(methods) - 1 else method
-        ax.set_title(method.replace("_", " + "), fontsize=title_sz, pad=-10)
+        axins = inset_locator.inset_axes(ax, width="5%", height="60%",  loc='lower left', bbox_to_anchor=(1.05, 0.1, 1, 1), bbox_transform=ax.transAxes, borderpad=0)
+        clb = fig.colorbar(st, cax=axins)
+        clb.set_ticks([0.0, np.max(pseudotimes)])
+        clb.set_ticklabels(["0", "1"])
+        label = "pSM value" if col == ncol - 1 else "pseudotime"
+        clb.ax.set_ylabel(label, labelpad=5, rotation=270, fontsize=10, weight='bold')
+        # method = "SpaceFlow" if mid == len(methods) - 1 else method
+        # method = method.capitalize() if method != "stLearn" else method
+        # ax.set_title(method.replace("_", " + "), fontsize=title_sz, pad=-10)
     fig_fp = f"{output_dir}/psudotime_comparison.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
@@ -269,9 +271,10 @@ def plot_umap_comparison(args, sample_name, dataset="DLPFC", n_neighbors=50):
     nrow, ncol = 1, len(methods)
 
     data_root = f'{args.dataset_dir}/{dataset}/{sample_name}'
-    fig, axs = figure(nrow, ncol, rsz=2.4, csz=2.8, wspace=.3, hspace=.3)
+    fig, axs = figure(nrow, ncol, rsz=3.2, csz=3.6, wspace=.3, hspace=.3)
     for ax in axs:
         ax.axis('off')
+    cm = plt.get_cmap("tab20")
 
     for mid, method in enumerate(methods):
         print(f"Processing {sample_name} {method}")
@@ -296,23 +299,25 @@ def plot_umap_comparison(args, sample_name, dataset="DLPFC", n_neighbors=50):
         df_meta = pd.read_csv(f'{data_root}/metadata.tsv', sep='\t')
         annotations = df_meta['layer_guess'].values.astype(str)
         cluster_names = list(np.unique(annotations))
-
-        cm = plt.get_cmap("tab10")
+        #n_cluster = len(cluster_names[:-1])
         for cid, cluster in enumerate(cluster_names[:-1]):
             umap_sub = umap_positions[annotations == cluster]
             color = cm(1. * cid / (len(cluster_names) + 1))
-            ax.scatter(umap_sub[:, 0], umap_sub[:, 1], s=2, color=color, label=cluster)
+            #color = cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
+            ax.scatter(umap_sub[:, 0], umap_sub[:, 1], s=1, color=color, label=cluster)
         if mid == len(methods) - 1:
             box = ax.get_position()
             height_ratio = 1.0
-            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
-            ax.legend(loc='center left', fontsize='x-small', bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.05,
+            ax.set_position([box.x0, box.y0, box.width * 0.75, box.height * height_ratio])
+            lgnd = ax.legend(loc='center left', fontsize=10, bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.05,
                       borderaxespad=.1)
+            for handle in lgnd.legendHandles:
+                handle._sizes = [12]
+        method = "SpaceFlow" if method == "DGI_SP" else method
         ax.set_title(method.replace("_", " + "), fontsize=title_sz)
     fig_fp = f"{output_dir}/umap_comparison.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
-
 
 def plot_umap_comparison_with_coord_alpha(args, sample_name, dataset="DLPFC", n_neighbors=50):
     methods = ["Seurat",  "stLearn", "DGI", "DGI_SP"]
@@ -364,20 +369,73 @@ def plot_umap_comparison_with_coord_alpha(args, sample_name, dataset="DLPFC", n_
             n = umap_sub.shape[0]
             colors = np.array([color_gradients[int(alphas[i] // 0.2) + 1] for i in range(n)])
             ax.scatter(umap_sub[:, 0], umap_sub[:, 1], s=1, color=colors, label=cluster)
-        if mid == len(methods) - 1:
-            box = ax.get_position()
-            height_ratio = 1.0
-            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
-            ax.legend(loc='center left', fontsize='x-small', bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.05,
-                      borderaxespad=.1)
+
         method = "SpaceFlow" if method == "DGI_SP" else method
         ax.set_title(method.replace("_", " + "), fontsize=title_sz, pad=10)
     fig_fp = f"{output_dir}/umap_comparison-calpha.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
+def plot_umap_comparison_with_coord_gradient(args, sample_name, dataset="DLPFC", n_neighbors=50):
+    methods = ["Seurat", "stLearn", "DGI", "DGI_SP"]
+    files = ["seurat.PCs.tsv", "PCs.tsv", "features.tsv", "features.tsv"]
+    nrow, ncol = 1, len(methods)
+    adata_origin = load_DLPFC_data(args, sample_name, v2=False)
+    coord = adata_origin.obsm['spatial'].astype(float)
+    x, y = coord[:, 0], coord[:, 1]
+    normed_x = (x - np.min(x))/(np.max(x) - np.min(x))
+    normed_y = (y - np.min(y))/(np.max(y) - np.min(y))
+    normed_c = np.sqrt(normed_x**2 + normed_y**2)
+    normed_c = (normed_c - np.min(normed_c))/(np.max(normed_c) - np.min(normed_c))
+    data_root = f'{args.dataset_dir}/{dataset}/{sample_name}'
+    fig, axs = figure(nrow, ncol, rsz=3, csz=3.6, wspace=.3, hspace=.3)
+    for ax in axs:
+        ax.axis('off')
+    cm = plt.get_cmap("RdPu")
+    for mid, method in enumerate(methods):
+        print(f"Processing {sample_name} {method}")
+        col = mid % ncol
+        ax = axs[col]
+        output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
+        umap_positions_fp = f"{output_dir}/umap_positions.tsv"
+        if not os.path.exists(umap_positions_fp):
+            file_name = files[mid]
+            feature_fp = f'{output_dir}/{file_name}'
+            if file_name.endswith("npz"):
+                obj = np.load(feature_fp)
+                adata = anndata.AnnData(obj.f.sedr_feat)
+            else:
+                adata = sc.read_csv(feature_fp, delimiter="\t")
+            sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
+            sc.tl.umap(adata)
+            umap_positions = adata.obsm["X_umap"]
+            np.savetxt(umap_positions_fp, umap_positions, fmt='%.5f\t%.5f', header='', footer='', comments='')
+        else:
+            umap_positions = pd.read_csv(umap_positions_fp, header=None, sep="\t").values.astype(float)
+        df_meta = pd.read_csv(f'{data_root}/metadata.tsv', sep='\t')
+        annotations = df_meta['layer_guess'].values.astype(str)
+        cluster_names = list(np.unique(annotations))
 
-def rank_marker_genes_group(args, sample_name, method="leiden", dataset="DLPFC"):
+        for cid, cluster in enumerate(cluster_names[:-1]):
+            ind = annotations == cluster
+            umap_sub = umap_positions[ind]
+            st = ax.scatter(umap_sub[:, 0], umap_sub[:, 1], s=1, c=normed_x[ind], label=cluster, cmap=cm)
+
+            if col == (ncol - 1) and cid == len(cluster_names[:-1]) - 1:
+                axins = inset_locator.inset_axes(ax, width="5%", height="80%", loc='lower left',
+                                                 bbox_to_anchor=(1.05, 0.05, 1, 1), bbox_transform=ax.transAxes, borderpad=0)
+                clb = fig.colorbar(st, cax=axins)
+                clb.set_ticks([np.nanmin(normed_x), np.nanmax(normed_x)])
+                clb.set_ticklabels(["Min", "Max"])
+                clb.ax.tick_params(labelsize=20)
+                clb.ax.set_ylabel("Dist. to (0,0)", labelpad=18, rotation=270, fontsize=14, weight='bold')
+        method = "SpaceFlow" if method == "DGI_SP" else method
+        ax.set_title(method.replace("_", " + "), fontsize=title_sz, pad=10)
+    fig_fp = f"{output_dir}/umap_comparison-coord_gradient.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
+def rank_marker_genes_group(args, sample_name, method="leiden", dataset="DLPFC", top_n_genes=3):
     original_spatial = args.spatial
     args.spatial = True
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
@@ -385,13 +443,35 @@ def rank_marker_genes_group(args, sample_name, method="leiden", dataset="DLPFC")
     adata_filtered, _ = preprocessing_data(args, adata)
     pred_clusters = pd.read_csv(f"{output_dir}/{method}.tsv", header=None).values.flatten().astype(str)
     adata_filtered.obs["leiden"] = pd.Categorical(pred_clusters)
-    sc.tl.rank_genes_groups(adata_filtered, 'leiden', method='wilcoxon')
-    sc.pl.rank_genes_groups(adata_filtered, n_genes=25, ncols=5, fontsize=10, sharey=False, save=True)
-    sc.pl.rank_genes_groups_heatmap(adata_filtered, n_genes=2, standard_scale='var', save="heatmap.pdf")
-    sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=2, standard_scale='var', save="mean_expr.pdf")
-    sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=2, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save="dot_lfc.pdf")
-    sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=2, values_to_plot="logfoldchanges", cmap='bwr', vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change', save="matrix_lfc.pdf")
+    sc.tl.rank_genes_groups(adata_filtered, method, method='wilcoxon')
+    sc.pl.rank_genes_groups(adata_filtered, n_genes=25, ncols=5, fontsize=10, sharey=False,
+                            save=f"{sample_name}_ranks_gby_{method}.pdf")
+    sc.pl.rank_genes_groups_heatmap(adata_filtered, n_genes=top_n_genes, standard_scale='var', show_gene_labels=True,
+                                    save=f"{sample_name}_heatmap_gby_{method}.pdf")
+    sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=top_n_genes, standard_scale='var', cmap='bwr',
+                                    save=f"{sample_name}_mean_expr_gby_{method}.pdf")
+    sc.pl.rank_genes_groups_dotplot(adata_filtered, n_genes=top_n_genes, values_to_plot="logfoldchanges", cmap='bwr',
+                                    vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change',
+                                    save=f"{sample_name}_dot_lfc_gby_{method}.pdf")
+    sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=top_n_genes, values_to_plot="logfoldchanges", cmap='bwr',
+                                       vmin=-4, vmax=4, min_logfoldchange=1.5, colorbar_title='log fold change',
+                                       save=f"{sample_name}_matrix_lfc_gby_{method}.pdf")
+    sc.pl.rank_genes_groups_matrixplot(adata_filtered, n_genes=top_n_genes, cmap='bwr', colorbar_title='Mean Expr.',
+                                       save=f"{sample_name}_matrix_mean_expr_gby_{method}.pdf")
     args.spatial = original_spatial
+
+    files = [f"rank_genes_groups_{method}{sample_name}_ranks_gby_{method}.pdf",
+             f"heatmap{sample_name}_heatmap_gby_{method}.pdf",
+             f"dotplot_{sample_name}_mean_expr_gby_{method}.pdf",
+             f"dotplot_{sample_name}_dot_lfc_gby_{method}.pdf",
+             f"matrixplot_{sample_name}_matrix_lfc_gby_{method}.pdf",
+             f"matrixplot_{sample_name}_matrix_mean_expr_gby_{method}.pdf"]
+
+    for file in files:
+        src_fp = f"./figures/{file}"
+        target_fp = f"{output_dir}/{file}"
+        shutil.move(src_fp, target_fp)
+
     cluster_marker_genes_fp = f'{output_dir}/marker_genes_pval.tsv'
     result = adata_filtered.uns['rank_genes_groups']
     groups = result['names'].dtype.names

@@ -223,7 +223,7 @@ def basic_pipeline():
 
         sc.pp.neighbors(adata, n_neighbors=n_neighbors[did])
         sc.tl.umap(adata)
-        resolution = res_search_fixed_clus("leiden", adata,8) if dataset == "stereo_seq" else resolutions[did]
+        resolution = res_search_fixed_clus("leiden", adata, 8) if dataset == "stereo_seq" else resolutions[did]
         sc.tl.leiden(adata, resolution=resolution)
         sc.tl.paga(adata)
         df_meta = pd.DataFrame(np.array(adata.obs['leiden']))

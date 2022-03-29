@@ -11,7 +11,7 @@ stereo.seq <- SCTransform(stereo.seq, assay = "Spatial", verbose = F)
 stereo.seq <- RunPCA(stereo.seq, assay = "SCT", verbose = F)
 stereo.seq <- RunUMAP(stereo.seq, reduction = "pca", dims = 1:50)
 stereo.seq <- FindNeighbors(stereo.seq, reduction = "pca", dims = 1:50)
-stereo.seq <- FindClusters(stereo.seq, resolution = .4, verbose = F)
+stereo.seq <- FindClusters(stereo.seq, resolution = .3, verbose = F)
 
 dir.output <- "../output/stereo_seq/stereo_seq/Seurat"
 dir.create(dir.output, showWarnings = F)
@@ -19,3 +19,5 @@ dir.create(dir.output, showWarnings = F)
 write.table(stereo.seq@reductions$pca@cell.embeddings, file = file.path(dir.output, 'seurat.PCs.tsv'), sep='\t', quote=F, row.names = F)
 
 write.table(stereo.seq@meta.data, file = file.path(dir.output, './metadata.tsv'), sep='\t', quote=F)
+
+

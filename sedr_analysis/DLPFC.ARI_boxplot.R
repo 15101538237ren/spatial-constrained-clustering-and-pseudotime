@@ -40,8 +40,9 @@ df.comp[df.comp$method=="DGI_spatial",1] = "SpaceFlow"
 ##### Plot results
 df.comp$method <- as.factor(df.comp$method)
 df.comp$method <- factor(df.comp$method, 
-                         levels = c("SpaceFlow", "DGI", "BayesSpace", "SEDR", "SpaGCN", "Giotto", "stLearn", "Seurat"))#"VASC", "VASC_spatial", "GAE", "GAE_spatial", "VGAE", "VGAE_spatial", "DGI", "DGI_spatial", "APPNP", "GAT", "RGCN", "DGI_w1", "DGI_expr", "DGI_w_spatial", "DGI_expr_spatial", 
+                         levels = c("SpaceFlow", "DGI", "BayesSpace", "SpaGCN", "Giotto", "stLearn", "Seurat"))#"VASC", "VASC_spatial", "GAE", "GAE_spatial", "VGAE", "VGAE_spatial", "DGI", "DGI_spatial", "APPNP", "GAT", "RGCN", "DGI_w1", "DGI_expr", "DGI_w_spatial", "DGI_expr_spatial", 
 
+tapply(df.comp$ARI, df.comp$method, summary)
 
 ggplot(df.comp, aes(x=method, y=ARI, fill=method)) + 
   geom_boxplot(width=0.5) + 

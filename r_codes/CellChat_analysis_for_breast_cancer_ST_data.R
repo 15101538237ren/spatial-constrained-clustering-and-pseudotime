@@ -59,18 +59,18 @@ pathways.sig.all <- cellchat@netP$pathways
 identity_df <- data.frame(table(cellchat@idents))
 colors_for_use <- colors_for_cell_types[match(identity_df$Var1, colors_df$Abbr)]
 groupSize <- as.numeric(table(cellchat@idents))
-invasive1 <- c(9)
-inv2n_intf3 <- c(8, 10)
+invasive1 <- c(6)
+inv2n_intf3 <- c(7,9)
 
-pdf(paste(c(fig_dir, "ccc_send_by_invasive1.pdf"), collapse = '/'), width=5, height=5, pointsize=12)
-netVisual_chord_gene(cellchat, sources.use = invasive1, targets.use = inv2n_intf3,signaling=c("FN1", "COLLAGEN", "ANGPTL", "THBS", "PERIOSTIN", "APP", "CD99"), color.use=colors_for_use, lab.cex = 0.5,legend.pos.y = 30, title.name = "L-R interactions from Invasive-1")#
+pdf(paste(c(fig_dir, "ccc_send_by_invasive1.pdf"), collapse = '/'), width=7, height=5, pointsize=12)
+netVisual_chord_gene(cellchat, sources.use = invasive1, targets.use = inv2n_intf3,signaling=c("COLLAGEN"), color.use=colors_for_use, lab.cex = 0.5,legend.pos.y = 30, title.name = "L-R interactions from Invasive-1")#"FN1", "COLLAGEN", "ANGPTL", "THBS", "PERIOSTIN", "APP", "CD99"
 dev.off()
 
 
-imm1 <- c(4)
-others <- c(1, 5, 6)
-pdf(paste(c(fig_dir, "ccc_send_by_immune_reg1.pdf"), collapse = '/'), width=6, height=5, pointsize=12)
-netVisual_chord_gene(cellchat, sources.use = imm1, targets.use = others,signaling=c("THBS", "MK", "APP", "COLLAGEN", "SEMA3"), color.use=colors_for_use, lab.cex = 0.5,legend.pos.y = 30, title.name = "L-R interactions from Imm-Reg-1")#
+imm1 <- c(3)
+others <- c(1, 4, 8)
+pdf(paste(c(fig_dir, "ccc_send_by_immune_reg1.pdf"), collapse = '/'), width=7, height=5, pointsize=12)
+netVisual_chord_gene(cellchat, sources.use = imm1, targets.use = others,signaling=c("MK", "APP"), color.use=colors_for_use, lab.cex = 0.5,legend.pos.y = 30, title.name = "L-R interactions from Imm-Reg-1")#
 dev.off()
 
 

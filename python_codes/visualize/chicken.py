@@ -443,8 +443,9 @@ def plot_annotated_cell_types(args, adatas, annotations_list, dataset="chicken",
     output_dir = f'{args.output_dir}/{dataset}/merged'
     mkdir(output_dir)
     samples = ['D4', 'D7', 'D10', 'D14']
-    fig, axs = figure(1, len(samples), rsz=2.8, csz=5.3, wspace=.5, hspace=.4)
+    fig, axs = figure(1, len(samples), rsz=2.8, csz=3.6, wspace=.05, hspace=.4)
     annotations_names, annotation_colors = get_cell_type_annotation_colors()
+    box_ratios = [.8, .8, .9, .7]
     for sid, sample in enumerate(samples):
         ax = axs[sid]
         ax.axis('off')
@@ -452,16 +453,15 @@ def plot_annotated_cell_types(args, adatas, annotations_list, dataset="chicken",
         x, y = coord[:, 0], coord[:, 1]
         annotations = annotations_list[sid]
         uniq_annots = np.unique(annotations)
-        box_width_ratio = .8 if sample != "D14" else .6
         for cid, annot in enumerate(uniq_annots):
             ind = annotations == annot
             ax.scatter(x[ind], y[ind], s=scatter_sz, color=annotation_colors[annot], label=annot)
 
         box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * box_width_ratio, box.height])
-        lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5))
-        for handle in lgnd.legendHandles:
-            handle._sizes = [10]
+        ax.set_position([box.x0, box.y0, box.width * box_ratios[sid], box.height])
+        # lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5))
+        # for handle in lgnd.legendHandles:
+        #     handle._sizes = [10]
         ax.set_title(sample, fontsize=title_sz)
     fig_fp = f"{output_dir}/annotated_cell_types.pdf"
     plt.savefig(fig_fp, dpi=300)
@@ -495,12 +495,12 @@ def plot_annotated_cell_regions(args, adatas, annotations_list, dataset="chicken
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
-def plot_annotated_clusters(args, adatas, sample_name="merged", dataset="chicken", method="leiden", scatter_sz= 4):
+def plot_annotated_clusters(args, adatas, sample_name="merged", dataset="chicken_bk", method="leiden", scatter_sz= 4):
     args.spatial = True
     output_dir = f'{args.output_dir}/{dataset}/{sample_name}'
     mkdir(output_dir)
     samples = ['D4', 'D7', 'D10', 'D14']
-    fig, axs = figure(1, len(samples), rsz=2.8, csz=4.8, wspace=.5, hspace=.4)
+    fig, axs = figure(1, len(samples), rsz=2.8, csz=3.6, wspace=.05, hspace=.4)
     annotation_colors = get_cluster_colors(args, samples)
     box_ratios = [.8, .8, .9, .7]
     for sid, sample in enumerate(samples):
@@ -524,9 +524,9 @@ def plot_annotated_clusters(args, adatas, sample_name="merged", dataset="chicken
 
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * box_ratios[sid], box.height])
-        lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5))
-        for handle in lgnd.legendHandles:
-            handle._sizes = [10]
+        # lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5))
+        # for handle in lgnd.legendHandles:
+        #     handle._sizes = [10]
         ax.set_title(sample, fontsize=title_sz)
     fig_fp = f"{output_dir}/annotated_clusters.pdf"
     plt.savefig(fig_fp, dpi=300)
@@ -559,7 +559,7 @@ def plot_expr_in_ST(args, adatas, gene_name, sample_name = "merged", dataset="ch
         coord = adata.obsm['spatial'].astype(float)
         x, y = coord[:, 0], coord[:, 1]
         expr = exprs[sid]/max_expr
-        st = ax.scatter(x, y, s=scatter_sz, c=expr, cmap=cm, vmin=0, vmax=1)#
+        st = ax.scatter(x, y, s=scatter_sz, c=expr, cmap=cm, vmin=0, vmax=1.6)#
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * box_ratios[sid], box.height])
         if sid == len(samples) - 1:
@@ -573,6 +573,50 @@ def plot_expr_in_ST(args, adatas, gene_name, sample_name = "merged", dataset="ch
     fig_fp = f"{output_dir}/{gene_name}_ST_expr.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
+
+def plot_expr_in_ST_horizontal(args, adatas, gene_name, sample_name = "merged", dataset="chicken", scatter_sz= 16., cm = plt.get_cmap("RdPu"), subdir=None):
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{dataset}/{sample_name}/expr_in_ST' if not subdir else f'{args.output_dir}/{dataset}/{sample_name}/expr_in_ST/{subdir}'
+    mkdir(output_dir)
+    samples = ['D4', 'D7', 'D10', 'D14']
+    nrow, ncol = 1, len(samples)
+    fig, axs = figure(nrow, ncol, rsz=2.6, csz=3, wspace=.1, hspace=.1)
+    for sid in range(len(adatas)):
+        if gene_name not in adatas[sid].var_names:
+            return
+    exprs = [np.asarray(adatas[sid][:, adatas[sid].var_names == gene_name].X.todense()).flatten() for sid, sample in enumerate(samples)]
+    max_exprs = [np.max(expr)for expr in exprs]
+    max_expr = max(max_exprs) * .6
+    box_ratios = [.9, .9, 1, .8]
+    for sid, sample in enumerate(samples):
+        row = sid // ncol
+        col = sid % ncol
+        ax = axs[row][col] if nrow > 1 else axs[col]
+        ax.get_xaxis().set_ticks([])
+        ax.get_yaxis().set_ticks([])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        adata = adatas[sid]
+        coord = adata.obsm['spatial'].astype(float)
+        x, y = coord[:, 0], coord[:, 1]
+        expr = exprs[sid]/max_expr
+        st = ax.scatter(x, y, s=scatter_sz, c=expr, cmap=cm, vmin=0, vmax=1.5)#
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * box_ratios[sid], box.height])
+        if sid == len(samples) - 1:
+            axins = inset_locator.inset_axes(ax, width="5%", height="50%", loc='lower left',
+                                             bbox_to_anchor=(1.02, 0.1, 1, 1), bbox_transform=ax.transAxes, borderpad=0)
+            clb = fig.colorbar(st, cax=axins)
+            clb.ax.set_ylabel("Expr", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        ax.set_title(sample, fontsize=12)
+        if sid == 0:
+            ax.set_ylabel(gene_name, fontsize=12)
+    fig_fp = f"{output_dir}/{gene_name}_ST_expr.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
 
 def plot_lineage_tsne(args, adata, cell_types, regions, days, cluster_annotations, lineage, dataset="chicken", scatter_sz= 2, n_neighbors=8, embedding=True):
     args.spatial = True
@@ -705,6 +749,50 @@ def plot_lineage_embedding_umap(args, adata, cell_types, regions, days, cluster_
     adata = sc.read_csv(feature_fp, delimiter="\t", first_column_names=None)
     plot_lineage_umap(args, adata, cell_types, regions, days, cluster_annotations, lineage, scatter_sz= scatter_sz, embedding=True)
 
+def plot_lineage_umap_colored_by_pseudotime(args, dataset="chicken", method="leiden", scatter_sz= 4, n_neighbors=10):
+    args.spatial = True
+    samples = ['D4', 'D7', 'D10', 'D14']
+    nrow, ncol = 2, len(samples)//2
+    fig, axs = figure(nrow, ncol, rsz=3.2, csz=3.2, wspace=.2, hspace=.5)
+    annotation_colors = get_cluster_colors(args, samples)
+
+    for sid, sample in enumerate(samples):
+        row = sid // ncol
+        col = sid % ncol
+        ax = axs[row][col] if nrow > 1 else axs[col]
+        ax.axis('off')
+        old_output_dir = f"{args.output_dir}/{get_target_fp(args, 'chicken_bk', sample)}"
+        pred_clusters = pd.read_csv(f"{old_output_dir}/{method}.tsv", header=None).values.flatten().astype(int)
+        uniq_clusters = np.array(np.unique(pred_clusters))
+        new_output_dir = f"{args.output_dir}/{get_target_fp(args, dataset, sample)}"
+        pseudotimes = pd.read_csv(f"{new_output_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
+        feature_fp = os.path.join(old_output_dir, "features.tsv")
+        adata = sc.read_csv(feature_fp, delimiter="\t", first_column_names=None)
+
+        sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
+        sc.tl.leiden(adata, resolution=.5)
+        sc.tl.umap(adata)
+
+        for cid, uniq_cluster in enumerate(uniq_clusters):
+            ind = pred_clusters == uniq_cluster
+            position = adata.obsm["X_umap"][ind]
+            x = -(position[:, 0] + position[:, 1]) / 2.0
+            x = -x if sid < 2 else x
+            ax.scatter(x, pseudotimes[ind], s=scatter_sz, color=f"#{annotation_colors[sid][uniq_cluster][1]}", label=annotation_colors[sid][uniq_cluster][0])
+
+        box_width_ratio = .8 if sample != "D14" else .6
+
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * box_width_ratio, box.height])
+        # lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5))
+        # for handle in lgnd.legendHandles:
+        #     handle._sizes = [10]
+        ax.set_title(sample, fontsize=title_sz)
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, "merged")}'
+    mkdir(output_dir)
+    fig_fp = f"{output_dir}/umap_vs_pseudotime_color_by_annotation.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
 
 def plot_lineage_phate(args, data_phate, cell_types, regions, days, cluster_annotations, lineage, dataset="chicken", scatter_sz= 4, embedding=True):
     args.spatial = True
@@ -884,7 +972,7 @@ def plot_pseudo_spatial_temporal_map(args, adatas, sample_name="merged", dataset
     output_dir = f'{args.output_dir}/{dataset}/{sample_name}'
     mkdir(output_dir)
     samples = ['D4', 'D7', 'D10', 'D14']
-    fig, axs = figure(1, len(samples), rsz=2.8, csz=4.8, wspace=.5, hspace=.4)
+    fig, axs = figure(1, len(samples), rsz=2.8, csz=3.6, wspace=.05, hspace=.4)
     box_ratios = [.8, .8, .9, .7]
     for sid, sample in enumerate(samples):
         ax = axs[sid]
@@ -894,10 +982,11 @@ def plot_pseudo_spatial_temporal_map(args, adatas, sample_name="merged", dataset
         pst_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample)}'
         pseudotimes = pd.read_csv(f"{pst_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
         st = ax.scatter(x, y, s=scatter_sz, c=pseudotimes, cmap=cm)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        clb = fig.colorbar(st, cax=cax)
-        clb.ax.set_ylabel("PST score", labelpad=10, rotation=270, fontsize=10, weight='bold')
+        if sid == len(samples) - 1:
+            axins = inset_locator.inset_axes(ax, width="5%", height="80%", loc='lower left',
+                                             bbox_to_anchor=(1.02, 0.1, 1, 1), bbox_transform=ax.transAxes, borderpad=0)
+            clb = fig.colorbar(st, cax=axins)
+            clb.ax.set_ylabel("PST score", labelpad=10, rotation=270, fontsize=10, weight='bold')
         ax.set_title(sample, fontsize=title_sz)
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * box_ratios[sid], box.height])
@@ -927,17 +1016,17 @@ def annotation_pipeline(args):
     sample_list = ['D4', 'D7', 'D10', 'D14']
     adatas, cell_type_annotations_list, region_annotations_list = [], [], []
     for sample_name in sample_list:
-        # anno_clusters, region_annos = get_annotations_chicken(args, sample_name)
-        # cell_type_annotations_list.append(anno_clusters)
+        anno_clusters, region_annos = get_annotations_chicken(args, sample_name)
+        cell_type_annotations_list.append(anno_clusters)
         # region_annotations_list.append(region_annos)
         adata = load_chicken_data(args, sample_name)
         adatas.append(adata)
-    # plot_annotated_cell_types(args, adatas, cell_type_annotations_list)
+    plot_annotated_cell_types(args, adatas, cell_type_annotations_list)
     # plot_annotated_cell_regions(args, adatas, region_annotations_list)
-    #plot_annotated_clusters(args, adatas)
-    plot_pseudo_spatial_temporal_map(args, adatas)
+    # plot_annotated_clusters(args, adatas)
+    # plot_pseudo_spatial_temporal_map(args, adatas)
 
-def train_pipeline(args, adata, sample_name, dataset="chicken", clustering_method="leiden", resolution = .8, n_neighbors = 10, isTrain=True):
+def train_pipeline(args, adata, sample_name, dataset="chicken", clustering_method="leiden", resolution = .8, n_neighbors =10, isTrain=True):
     adata_filtered, spatial_graph = preprocessing_data(args, adata)
     if isTrain:
         for spatial in [False, True]:
@@ -1039,35 +1128,37 @@ def cell_cell_communication_prep_pipeline(args):
         save_adata_to_preprocessing_dir(args, adata_pp, sample, cells, annotation_colors[sid])
 
 def gene_ontology_pipeline(args):
-    lineage = "_".join(["Valve cells", "MT-enriched valve cells"])
-    save_background_genes(args, load_chicken_data(args, "D14"), lineage)
-    top_n_cluster_specific_genes = get_top_n_cluster_specific_genes(args, lineage, method="combined_cluster", top_n=10)
+    lineage = "Valve"#"_".join(["Valve cells", "MT-enriched valve cells"])
+    #save_background_genes(args, load_chicken_data(args, "D14"), lineage)
+    top_n_cluster_specific_genes = get_top_n_cluster_specific_genes(args, lineage, method="combined_merged_cluster", top_n=10)
 
 def lineage_pipeline(args, all_lineage=False):
-    sample_list = ['D4', 'D7', 'D10', 'D14']#
-    adatas, cell_types, regions, days = [], [], [], []
-    for sample_name in sample_list:
-        adata = load_chicken_data(args, sample_name)
-        adatas.append(adata)
+    # sample_list = ['D4', 'D7', 'D10', 'D14']#
+    # adatas, cell_types, regions, days = [], [], [], []
+    # for sample_name in sample_list:
+    #     adata = load_chicken_data(args, sample_name)
+    #     adatas.append(adata)
+    #
+    #     sample_cell_types, sample_regions = get_annotations_chicken(args, sample_name)
+    #     cell_types.append(sample_cell_types)
+    #     regions.append(sample_regions)
+    #
+    #     sample_days = np.array([sample_name for _ in range(sample_cell_types.shape[0])])
+    #     days.append(sample_days)
 
-        sample_cell_types, sample_regions = get_annotations_chicken(args, sample_name)
-        cell_types.append(sample_cell_types)
-        regions.append(sample_regions)
+    # cluster_annotations = get_cluster_annotations_chicken(args, sample_list)
+    plot_lineage_umap_colored_by_pseudotime(args)
 
-        sample_days = np.array([sample_name for _ in range(sample_cell_types.shape[0])])
-        days.append(sample_days)
-
-    cluster_annotations = get_cluster_annotations_chicken(args, sample_list)
-    if all_lineage:
-        lineage_name = "merged"
-        merged_adata, merged_cluster_annotations, merged_cell_types, merged_regions, merged_days = merge_adatas_annotations_chicken(adatas, cluster_annotations, cell_types, regions, days)
-    else:
-        lineages = ["Valve"]
-        lineage_name = "_".join(lineages)
-        filtered_adatas, filtered_annotations, filtered_cell_types, filtered_regions, filtered_days = filter_adatas_annotations_chicken(adatas, cluster_annotations, cell_types, regions, days, lineages)
-        merged_adata, merged_cluster_annotations, merged_cell_types, merged_regions, merged_days = merge_adatas_annotations_chicken(filtered_adatas, filtered_annotations, filtered_cell_types, filtered_regions, filtered_days)
-        # plot_lineage_annotated_clusters(args, adatas, filtered_adatas, lineage_name)
-    adata_filtered = train_pipeline(args, merged_adata, lineage_name, resolution=.4, isTrain=False)
+    # if all_lineage:
+    #     lineage_name = "merged"
+    #     merged_adata, merged_cluster_annotations, merged_cell_types, merged_regions, merged_days = merge_adatas_annotations_chicken(adatas, cluster_annotations, cell_types, regions, days)
+    # else:
+    #     lineages = ["Valve"]
+    #     lineage_name = "_".join(lineages)
+    #     filtered_adatas, filtered_annotations, filtered_cell_types, filtered_regions, filtered_days = filter_adatas_annotations_chicken(adatas, cluster_annotations, cell_types, regions, days, lineages)
+    #     merged_adata, merged_cluster_annotations, merged_cell_types, merged_regions, merged_days = merge_adatas_annotations_chicken(filtered_adatas, filtered_annotations, filtered_cell_types, filtered_regions, filtered_days)
+    # plot_lineage_annotated_clusters(args, adatas, filtered_adatas, lineage_name)
+    # adata_filtered = train_pipeline(args, merged_adata, lineage_name, resolution=.4, isTrain=False)
 
     # plot_lineage_expr_tsne(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name, scatter_sz= 1)
     # plot_lineage_embedding_tsne(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
@@ -1078,8 +1169,8 @@ def lineage_pipeline(args, all_lineage=False):
     # plot_lineage_expr_phate(args, adata_filtered, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
     # plot_lineage_embedding_phate(args, merged_cell_types, merged_regions, merged_days, merged_cluster_annotations, lineage_name)
 
-    combined_merged_annotations = get_combined_merged_annotations(merged_days, merged_cluster_annotations)
-    plot_rank_marker_genes_group(args, lineage_name, adata_filtered, combined_merged_annotations, method= "combined_merged_cluster", top_n_genes=5)
+    # combined_merged_annotations = get_combined_merged_annotations(merged_days, merged_cluster_annotations)
+    # plot_rank_marker_genes_group(args, lineage_name, adata_filtered, combined_merged_annotations, method= "combined_merged_cluster", top_n_genes=5)
 
     # plot_phate_pseudotime(args, lineage, merged_adata, merged_days)
     # plot_lineage_pseudotime(args, adatas, cluster_annotations, lineage_name, adata_filtered, merged_days)
@@ -1100,7 +1191,7 @@ def corr_expr_analysis_pipeline(args):
         subdir = f"{sample}_Genes_Corr_wt_PST"
         genes = genes_corred[sid]
         for gene in genes:
-            plot_expr_in_ST(args, adatas, gene, scatter_sz=1, subdir=subdir)
+            plot_expr_in_ST_horizontal(args, adatas, gene, scatter_sz=2, subdir=subdir)
 
 
 

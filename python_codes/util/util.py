@@ -63,6 +63,11 @@ def load_seqfish_mouse_data():
     sc.pp.filter_genes(adata, min_cells=3)
     return adata
 
+def load_visium_data(args, dataset):
+    adata = sc.datasets.visium_sge(dataset, include_hires_tiff=False)
+    sc.pp.filter_genes(adata, min_cells=3)
+    return adata
+
 def load_stereo_seq_data(args):
     file_fold = f'{args.dataset_dir}/stereo_seq'
     adata = sc.read_csv(f"{file_fold}/RNA_counts.tsv", delimiter='\t', first_column_names=True)
@@ -94,11 +99,11 @@ def load_breast_cancer_data(args, sample_name):
     coord_df = pd.read_csv(coord_fp, delimiter='\t')
     spots_idx_dicts = {f"{item[0]}x{item[1]}" : idx for idx, item in enumerate(coord_df[["x", "y"]].values.astype(int))}
     spots_selected = np.array([sid for sid, spot in enumerate(list(adata.obs_names)) if spot in spots_idx_dicts]).astype(int)
+    coords = coord_df[["pixel_x", "pixel_y"]].values
+    adata.obsm["spatial"] = np.array([coords[spots_idx_dicts[spot]] for spot in adata.obs_names])
     adata = adata[spots_selected, :]
     coord_df = coord_df.iloc[spots_selected, :]
     spots_idx_dicts = {f"{item[0]}x{item[1]}": idx for idx, item in enumerate(coord_df[["x", "y"]].values.astype(int))}
-    coords = coord_df[["pixel_x", "pixel_y"]].values
-    adata.obsm["spatial"] = np.array([coords[spots_idx_dicts[spot]] for spot in adata.obs_names])
     return adata, spots_idx_dicts
 
 def load_preprocessed_data(args, dataset, sample_name, sedr=False):

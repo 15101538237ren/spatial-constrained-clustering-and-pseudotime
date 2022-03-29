@@ -24,10 +24,10 @@ plot_cell_trajectory(stereo.seq, color_by = "Pseudotime")
 
 
 
-dir.output <- "../output/stereo_seq/stereo_seq/monocole"
+dir.output <- "../output/stereo_seq/stereo_seq/monocle"
 dir.create(dir.output, showWarnings = F)
 
-write.table(stereo.seq$Pseudotime, file = file.path(dir.output, 'pseudotime.tsv'), sep='\t', quote=F, row.names = F)
+write.table(stereo.seq$Pseudotime, file = file.path(dir.output, 'pseudotime.tsv'), sep='\t', quote=F, row.names = F, col.names = F)
 
 
 

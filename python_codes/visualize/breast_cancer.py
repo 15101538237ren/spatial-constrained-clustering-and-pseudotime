@@ -16,6 +16,7 @@ from sklearn.decomposition import PCA
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
 from python_codes.util.util import load_breast_cancer_data, preprocessing_data, save_features
+from python_codes.util.exchangeable_loom import write_exchangeable_loom
 warnings.filterwarnings("ignore")
 from python_codes.util.util import *
 from matplotlib import rcParams
@@ -290,7 +291,7 @@ def plot_hne_and_annotation(args, adata, sample_name, nrow = 1, scale = 0.045, n
         fp = f'{args.dataset_dir}/Visium/Breast_Cancer/ST-imgs/{sample_name[0]}/{sample_name}/HE.jpg'
     img = plt.imread(fp)
     ax.imshow(img)
-    ax.set_title("H & E", fontsize=title_sz)
+    # ax.set_title("H & E", fontsize=title_sz)
     x, y = adata.obsm["spatial"][:, 0]*scale, adata.obsm["spatial"][:, 1]*scale
     if not annotation:
         xlim = [np.min(x), np.max(x) * 1.05]
@@ -345,7 +346,8 @@ def plot_pseudotime(args, adata, sample_name, dataset="breast_cancer", cm = plt.
         ax.imshow(img)
         args.spatial = spatial
         output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
-        pseudotimes = pd.read_csv(f"{output_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
+        fp = f"{output_dir}/pseudotime.tsv"
+        pseudotimes = pd.read_csv(fp, header=None).values.flatten().astype(float)
         st = ax.scatter(x, y, s=1, c=pseudotimes, cmap=cm)
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -361,7 +363,7 @@ def plot_pseudotime(args, adata, sample_name, dataset="breast_cancer", cm = plt.
 def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", dataset="breast_cancer", scale = 1., scatter_sz=1.3, nrow = 1, annotation=False, alpha=.5):
     original_spatial = args.spatial
     args.spatial = True
-    fig, axs, x, y, img, xlim, ylim = plot_hne_and_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=4, rsz=2.6,
+    fig, axs, x, y, img, xlim, ylim = plot_hne_and_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=5, rsz=2.6,
                                                               csz=3.9, wspace=1, hspace=.4, annotation=annotation)
     ax = axs[1]
     ax.imshow(img, alpha=alpha)
@@ -401,7 +403,7 @@ def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", da
         ind = pred_clusters == cluster
         ax.scatter(x[ind], y[ind], s=scatter_sz, color=color_dict_for_cluster[cluster], label=cluster)
 
-    ax.set_title("Clustering", fontsize=title_sz)
+    ax.set_title("SpaceFlow", fontsize=title_sz)
     ax.legend(fontsize=8, loc='center left', bbox_to_anchor=(1.0, 0.5))
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
@@ -416,13 +418,82 @@ def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", da
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%")
     clb = fig.colorbar(st, cax=cax)
+    clb.ax.set_ylabel("PST Score", labelpad=10, rotation=270, fontsize=8, weight='bold')
+    ax.set_title("PST Map", fontsize=title_sz)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.invert_yaxis()
+
+    ax = axs[4]
+    ax.imshow(img, alpha=alpha)
+    pseudotimes = pd.read_csv(f"{args.output_dir}/{dataset}/{sample_name}/monocole/pseudotime.tsv", header=None).values.flatten().astype(float)
+    pseudo_time_cm = plt.get_cmap("gist_rainbow")
+    st = ax.scatter(x, y, s=scatter_sz, c=pseudotimes, cmap=pseudo_time_cm)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%")
+    clb = fig.colorbar(st, cax=cax)
     clb.ax.set_ylabel("pseudotime", labelpad=10, rotation=270, fontsize=8, weight='bold')
-    ax.set_title("Pseudotime", fontsize=title_sz)
+    ax.set_title("Monocole", fontsize=title_sz)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     ax.invert_yaxis()
 
     fig_fp = f"{output_dir}/cluster+pseudotime.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+    args.spatial = original_spatial
+
+
+def plot_clustering_and_pseudotime_SI(args, adata, sample_name, method="leiden", dataset="breast_cancer", scale = 1., scatter_sz=1.3, nrow = 1, annotation=False, cluster_cm = plt.get_cmap("tab10"),pseudotime_cm = plt.get_cmap("gist_rainbow"), alpha=.5):
+    original_spatial = args.spatial
+    args.spatial = True
+    fig, axs, x, y, img, xlim, ylim = plot_hne_and_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=4, rsz=2.6,
+                                                              csz=2.8, wspace=.3, hspace=.2, annotation=annotation)
+    ax = axs[1]
+    ax.imshow(img, alpha=alpha)
+    fp = f'{args.dataset_dir}/Visium/Breast_Cancer/ST-cluster/lbl/{sample_name}-cluster-annotation.tsv'
+    df = pd.read_csv(fp, sep="\t")
+    coords = df[["pixel_x", "pixel_y"]].values.astype(float)
+    pred_clusters = df["label"].values.astype(int)
+    uniq_pred = np.unique(pred_clusters)
+    n_cluster = len(uniq_pred)
+    for cid, cluster in enumerate(uniq_pred):
+        ind = pred_clusters == cluster
+        color = cluster_cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
+        ax.scatter(coords[ind, 0], coords[ind, 1], s=scatter_sz, color=color, label=str(cluster))
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.invert_yaxis()
+
+    ax = axs[2]
+    ax.imshow(img, alpha=alpha)
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+    pred_clusters = pd.read_csv(f"{output_dir}/{method}.tsv", header=None).values.flatten().astype(str)
+    uniq_pred = np.unique(pred_clusters)
+    n_cluster = len(uniq_pred)
+    for cid, cluster in enumerate(uniq_pred):
+        ind = pred_clusters == cluster
+        color = cluster_cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
+        ax.scatter(x[ind], y[ind], s=scatter_sz, color=color, label=cluster)
+
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.invert_yaxis()
+
+    ax = axs[3]
+    ax.imshow(img, alpha=alpha)
+
+    pseudotimes = pd.read_csv(f"{output_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
+    st = ax.scatter(x, y, s=scatter_sz, c=pseudotimes, cmap=pseudotime_cm)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%")
+    clb = fig.colorbar(st, cax=cax)
+    clb.ax.set_ylabel("pSM value", labelpad=10, rotation=270, fontsize=8, weight='bold')
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.invert_yaxis()
+
+    fig_fp = f"{output_dir}/segmentation_pseudotime.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
     args.spatial = original_spatial
@@ -736,10 +807,76 @@ def plot_umap_tsne_phate_color_by_pseudotime(args, sample_name, adata, n_neighbo
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
+def plot_umap_tsne_phate_vs_pseudotime(args, sample_name, adata, pred_clusters, color_dict, n_neighbors=6, ncol = 3, scatter_sz= 4, method="leiden", dataset="breast_cancer", embedding=True):
+
+    fig, axs = figure(1, ncol, rsz=2.8, csz=4.4, wspace=.4, hspace=.2)
+
+    sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
+    sc.tl.leiden(adata, resolution=.5)
+
+    sc.tl.umap(adata)
+    sc.tl.tsne(adata, perplexity=20, use_rep='X')
+
+    phate_op = phate.PHATE(k=n_neighbors, t=80, gamma=1)
+    data_phate = phate_op.fit_transform(adata.X)
+    positions = [adata.obsm["X_umap"], adata.obsm["X_tsne"], data_phate]
+    vis_names = ["UMAP", "t-SNE", "PHATE"]
+    args.spatial = True
+    output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
+
+    pseudotimes = pd.read_csv(f"{output_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
+
+    for idx in range(ncol):
+        ax = axs[idx]
+        name = vis_names[idx]
+        ax.axis('off')
+
+        uniq_clusters = np.array(np.unique(pred_clusters))
+
+        for cid, uniq_cluster in enumerate(uniq_clusters):
+            ind = pred_clusters == uniq_cluster
+            position = positions[idx][ind]
+            x = -(position[:, 0] + position[:, 1]) / 2.0
+            ax.scatter(x, pseudotimes[ind], s=scatter_sz, color=color_dict[uniq_cluster], label=uniq_cluster)
+
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5))
+        for handle in lgnd.legendHandles:
+            handle._sizes = [10]
+
+        ax.set_title(name, fontsize=title_sz)
+    name = "embedding" if embedding else "expr"
+    fig_fp = f"{output_dir}/{name}_latent_space_vs_pseudotime.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
 
 ####################################
 #-------------Pipelines------------#
 ####################################
+def export_data_pipeline(args, filtered = True):
+    dataset = "breast_cancer"
+    sample_name = "G1"
+    data_root = f'{args.dataset_dir}/Visium/{dataset}/export/{sample_name}'
+    mkdir(data_root)
+
+    if filtered:
+        if os.path.exists(f"{args.dataset_dir}/{dataset}/{sample_name}/preprocessed/adata_filtered.h5ad"):
+            adata, _ = load_preprocessed_data(args, dataset, sample_name)
+        else:
+            adata, _ = load_breast_cancer_data(args, sample_name)
+            adata, spatial_graph = preprocessing_data(args, adata)
+            save_preprocessed_data(args, dataset, sample_name, adata, spatial_graph)
+        write_exchangeable_loom(adata, f'{data_root}/adata_filtered.loom')
+        adata.write(f'{data_root}/adata_filtered.h5ad')
+    else:
+        adata, _ = load_breast_cancer_data(args, sample_name)
+        adata.write(f'{data_root}/adata.h5ad')
+        write_exchangeable_loom(adata, f'{data_root}/adata.loom')
+    locs = pd.DataFrame(adata.obsm["spatial"], columns=["x", "y"])
+    locs.to_csv(f"{data_root}/locs.tsv", sep="\t", index=False)
+    print(f'===== Exported {dataset} =====')
 
 def train_pipeline(args, adata, sample_name, dataset="breast_cancer", clustering_method="leiden", resolution=.5, n_neighbors=6, isTrain=True):
     adata_filtered, spatial_graph = preprocessing_data(args, adata)
@@ -779,9 +916,9 @@ def umap_pipeline(args):
         pred_clusters, color_dict_for_cluster, selected_cluster_indices = get_clusters_and_color_dict(args, sample_name,
                                                                                                       spots_idx_dicts,
                                                                                                       original)
-        plot_umap_tsne_phate(args, sample_name, adata_embed, pred_clusters, color_dict_for_cluster, original=original,
-                             embedding=True, save_umap=False)
-        # plot_umap_tsne_phate_color_by_pseudotime(args, sample_name, adata_embed, embedding=True)
+        # plot_umap_tsne_phate(args, sample_name, adata_embed, pred_clusters, color_dict_for_cluster, original=original,
+        #                      embedding=True, save_umap=False)
+        plot_umap_tsne_phate_vs_pseudotime(args, sample_name, adata_embed, pred_clusters, color_dict_for_cluster, embedding=True)
         # plot_umap_tsne_phate(args, sample_name, adata_expr, pred_clusters, color_dict_for_cluster, original=original,
         #                      embedding=False)
         #
@@ -794,18 +931,22 @@ def umap_pipeline(args):
         # plot_umap_tsne_phate(args, sample_name, adata_embed, pred_clusters, color_dict_for_cluster, original=original, embedding=True)
         # plot_umap_tsne_phate(args, sample_name, adata_expr, pred_clusters, color_dict_for_cluster, original=original, embedding=False)
 
+
+
 def basic_pipeline(args):
-    letters = ["G"]#["A", "B", "C", "D", "E", "F", "G", "H"]#["H"]#
+    letters = ["A", "B", "C", "D", "E", "F", "H"]#["H"]#["G"]#, "G"
     n_samples = [1 for letter in letters] #[6, 6, 6, 6, 3, 3, 3, 3]#
     sample_list = [f"{letter}{sid}" for lid, letter in enumerate(letters) for sid in range(1, n_samples[lid] + 1)]
 
     for sample_name in sample_list:
-        adata, spots_idx_dicts = load_breast_cancer_data(args, sample_name)
-        adata_filtered = train_pipeline(args, adata, sample_name, n_neighbors=5, isTrain=False)
+        # adata, spots_idx_dicts = load_breast_cancer_data(args, sample_name)
+        # adata_filtered = train_pipeline(args, adata, sample_name, n_neighbors=5, isTrain=False)
         # plot_clustering(args, adata, sample_name, scatter_sz=3, annotation=False, scale=1)
         # plot_pseudotime(args, adata, sample_name)
-        plot_rank_marker_genes_group(args, sample_name, adata_filtered, top_n_genes=5)
+        # plot_rank_marker_genes_group(args, sample_name, adata_filtered, top_n_genes=5)
         # get_correlation_matrix_btw_clusters(args, sample_name, adata_filtered)
+        adata, _ = load_breast_cancer_data(args, sample_name)
+        plot_clustering_and_pseudotime_SI(args, adata, sample_name, scatter_sz=5)
 
 def figure_pipeline(args):
     sample_list = ["G1"]
@@ -814,7 +955,7 @@ def figure_pipeline(args):
         plot_clustering_and_pseudotime(args, adata, sample_name, scatter_sz=5)
         # adata_filtered = train_pipeline(args, adata, sample_name, n_neighbors=5, isTrain=False)
         # plot_clustering(args, adata, sample_name, scatter_sz=3, annotation=False, scale=1)
-        # plot_pseudotime(args, adata, sample_name)
+        plot_pseudotime(args, adata, sample_name)
 
 def calc_pseudotime_corr_genes(args, adata, sample_name, dataset, n_top=16):
     original_spatial = args.spatial
@@ -849,11 +990,11 @@ def expr_analysis_pipeline(args):
                 cs_genes[-1] = 'ERBB2'
                 cs_genes[-2] = 'VIM'
             elif cs_name == "Invasive-1":
-                cs_genes[-1] = 'FAP'
+                cs_genes[-1] = 'TNFSF10'
                 cs_genes[-2] = 'S100A4'
                 cs_genes[-3] = 'MCAM'
                 cs_genes[-4] = 'VEGFA'
-                cs_genes[0] = 'BAMBI'
+                cs_genes[0] = 'TNFSF10'
 
             plot_expr_in_ST(args, adata, cs_genes, sample_name, cs_name, scatter_sz=7)
             # plot_expr_in_UMAP(args, adata, cs_genes, sample_name, cs_name, scatter_sz=7)

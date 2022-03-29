@@ -77,23 +77,23 @@ results.table.p= all_res_final[which(all_res_final$weightFisher<=0.001),]
 #save first top 50 ontolgies sorted by adjusted pvalues
 target_file_name = paste(c("topGO_terms_of_cluster_", cluster_id, ".tsv"), collapse = '')
 
-write.table(results.table.p, paste(c(input_dir_fp, target_file_name), collapse = '/'),sep="\t",quote=FALSE,row.names=FALSE)
+#write.table(results.table.p, paste(c(input_dir_fp, target_file_name), collapse = '/'),sep="\t",quote=FALSE,row.names=FALSE)
 
-results.table.p$log10WF=-log10(as.numeric(results.table.p$weightFisher))
+#results.table.p$log10WF=-log10(as.numeric(results.table.p$weightFisher))
 
 library(ggplot2)
 library(dplyr)
 
+marker_genes_filename = 'topGO_terms_of_cluster_3.tsv'
+results.table.p =read.table(paste(c(input_dir_fp, marker_genes_filename), collapse = '/'), header=TRUE, sep='\t')
+results.table.p$log10P=-log10(as.numeric(results.table.p$pval))
 # Reorder following the value of another column:
 results.table.p %>%
-  mutate(Term = reorder(Term, log10WF)) %>%
-  ggplot( aes(x=Term, y=log10WF,fill = log10WF)) +
+  mutate(Term = reorder(Term, log10P)) %>%
+  ggplot( aes(x=Term, y=log10P,fill = log10P)) +
   geom_bar(stat="identity", alpha=.6, width=.4) +
   coord_flip() +
-  scale_fill_gradient(name="-log10(adj.pval)", low="blue", high="red",
-                      limits = c(3.0, 4.0), 
-                      breaks = c(3.1, 3.5, 3.9),
-                      labels = c(3.0, 3.5, 4.0)) +
+  scale_fill_gradient(name="-log10(adj.pval)", low="blue", high="red") +
   xlab("") + ylab("-log10(adj.pval)") + theme_bw()+ 
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),

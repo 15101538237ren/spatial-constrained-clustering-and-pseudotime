@@ -37,8 +37,8 @@ def plot_annotation(args, adata, nrow = 1, scale = 0.045, ncol=4, rsz=2.5, csz=2
     xlim, ylim = None, None
     return fig, axs, x, y, xlim, ylim
 
-def plot_clustering(args, adata, adata_sedr, sample_name, dataset, cm= plt.get_cmap("tab20"), scale=.62, scatter_sz=1., nrow= 2, ncol=3, method="leiden"):
-    fig, axs, x, y, xlim, ylim = plot_annotation(args, adata, scale=scale, nrow=nrow, ncol=ncol, rsz=6.0, csz=6.8, wspace=.2, hspace=.3, left=.1, right=.95)
+def plot_clustering(args, adata, adata_sedr, sample_name, dataset, cm= plt.get_cmap("tab20"), scale=.62, scatter_sz=1., nrow= 1, ncol=4, method="leiden"):
+    fig, axs, x, y, xlim, ylim = plot_annotation(args, adata, scale=scale, nrow=nrow, ncol=ncol, rsz=5.0, csz=6.3, wspace=.15, hspace=.2, left=.1, right=.95)
     key_dict = {"seqfish_mouse" : "celltype_mapped_refined", "slideseq_v2": "cluster"}
     annotated_cell_types = adata.obs[key_dict[dataset]].values.astype(str)
     seurat_clusters = pd.read_csv(f"{args.output_dir}/{dataset}/{sample_name}/Seurat/metadata.tsv", sep="\t")["seurat_clusters"].values.flatten().astype(int)
@@ -49,8 +49,8 @@ def plot_clustering(args, adata, adata_sedr, sample_name, dataset, cm= plt.get_c
     args.spatial = True
     dgi_sp_clusters = pd.read_csv(f"{args.output_dir}/{get_target_fp(args, dataset, sample_name)}/{method}.tsv",header=None).values.flatten().astype(int)
 
-    clusters_arr = [annotated_cell_types, seurat_clusters, scanpy_clusters, sedr_clusters, dgi_clusters, dgi_sp_clusters]
-    cluster_methods = ["Annotation", "Seurat", "Scanpy", "SEDR", "DGI", "DGI + SP"]
+    clusters_arr = [annotated_cell_types, seurat_clusters, scanpy_clusters, dgi_sp_clusters]#sedr_clusters, dgi_clusters,
+    cluster_methods = ["Annotation", "Seurat", "Scanpy", "SpaceFlow"]#, "SEDR", "DGI"
     for cid, clusters in enumerate(clusters_arr):
         row = cid // ncol
         col = cid % ncol
@@ -76,7 +76,7 @@ def plot_clustering(args, adata, adata_sedr, sample_name, dataset, cm= plt.get_c
             handle._sizes = [10]
         ax.set_facecolor("none")
         ax.invert_yaxis()
-        ax.set_title(cluster_methods[cid], fontsize=25)
+        ax.set_title(cluster_methods[cid], fontsize=32, pad=10)
     output_dir = f"{args.output_dir}/{dataset}/{sample_name}"
     fig_fp = f"{output_dir}/cluster_comp.pdf"
     plt.savefig(fig_fp, dpi=300)
@@ -87,7 +87,7 @@ def plot_pipeline():
     max_cells = 8000
     args.dataset_dir = f'../../data'
     args.output_dir = f'../../output'
-    datasets = ["seqfish_mouse"] #, "slideseq_v2"
+    datasets = ["slideseq_v2"] #, "seqfish_mouse"
     for dataset in datasets:
         print(f'===== Data {dataset} =====')
         data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'

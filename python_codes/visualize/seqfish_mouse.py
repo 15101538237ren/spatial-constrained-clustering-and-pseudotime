@@ -7,6 +7,7 @@ from python_codes.train.pseudotime import pseudotime
 from python_codes.util.util import load_seqfish_mouse_data, preprocessing_data, save_preprocessed_data, load_preprocessed_data, save_features
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
+from scipy.spatial import distance_matrix
 warnings.filterwarnings("ignore")
 from scipy.sparse import csr_matrix
 from python_codes.util.util import *
@@ -283,6 +284,67 @@ def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, met
         for group in groups for key in ['names', 'pvals']})
     df.to_csv(cluster_marker_genes_fp, sep="\t", index=False)
 
+def plot_pseudotime_comparison(args, adata, sample_name, dataset="seqfish_mouse", cm = plt.get_cmap("gist_rainbow"), scale = 0.045, n_neighbors=50, root_cell_type = None, cell_types=None):
+    methods = ["Seurat", "monocle", "slingshot", "DGI_SP"]#, "stLearn", "DGI"
+    files = ["seurat.PCs.tsv", None, None, "features.tsv"]#, "PCs.tsv", "features.tsv"
+    nrow, ncol = 1, len(methods)
+
+    coord = adata.obsm['spatial'].astype(float) * scale
+    x, y = coord[:, 0], coord[:, 1]
+
+    fig, axs = figure(nrow, ncol, rsz=2.4, csz=2.8, wspace=.35, hspace=.3)
+    for ax in axs:
+        ax.axis('off')
+        ax.invert_yaxis()
+
+    for mid, method in enumerate(methods):
+        print(f"Processing {sample_name} {method}")
+        col = mid % ncol
+        ax = axs[col]
+        output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
+        pseudotime_fp = f"{output_dir}/pseudotime.tsv"
+        if not os.path.exists(pseudotime_fp):
+            file_name = files[mid]
+            feature_fp = f'{output_dir}/{file_name}'
+            if file_name.endswith("npz"):
+                obj = np.load(feature_fp)
+                adata = anndata.AnnData(obj.f.sedr_feat)
+            else:
+                adata = sc.read_csv(feature_fp, delimiter="\t")
+            sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
+            sc.tl.umap(adata)
+            sc.tl.leiden(adata, resolution=.8)
+            sc.tl.paga(adata)
+            distances = distance_matrix(adata.X, adata.X)
+            sum_dists = distances.sum(axis=1)
+            adata.uns['iroot'] = np.argmax(sum_dists)
+            if root_cell_type:
+                descend_dist_inds = sorted(range(len(sum_dists)), key=lambda k: sum_dists[k], reverse=True)
+                for root_idx in descend_dist_inds:
+                    if cell_types[root_idx] == root_cell_type:
+                        adata.uns['iroot'] = root_idx
+                        break
+            sc.tl.diffmap(adata)
+            sc.tl.dpt(adata)
+            pseudotimes = adata.obs['dpt_pseudotime'].to_numpy()
+            np.savetxt(pseudotime_fp, pseudotimes, fmt='%.5f', header='', footer='', comments='')
+            print("Saved %s succesful!" % pseudotime_fp)
+        else:
+            pseudotimes = pd.read_csv(pseudotime_fp, header=None).values.flatten().astype(float)
+        st = ax.scatter(x, y, s=1, c=pseudotimes, cmap=cm)
+        axins = inset_locator.inset_axes(ax, width="5%", height="60%",  loc='lower left', bbox_to_anchor=(1.05, 0.1, 1, 1), bbox_transform=ax.transAxes, borderpad=0)
+        clb = fig.colorbar(st, cax=axins)
+        clb.set_ticks([0.0, np.max(pseudotimes)])
+        clb.set_ticklabels(["0", "1"])
+        label = "pSM value" if col == ncol - 1 else "pseudotime"
+        clb.ax.set_ylabel(label, labelpad=5, rotation=270, fontsize=10, weight='bold')
+        # method = "SpaceFlow" if mid == len(methods) - 1 else method
+        # method = method.capitalize() if method != "stLearn" else method
+        # ax.set_title(method.replace("_", " + "), fontsize=title_sz, pad=-10)
+    fig_fp = f"{output_dir}/psudotime_comparison.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
 
 ####################################
 #-------------Pipelines------------#
@@ -290,14 +352,26 @@ def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, met
 
 def export_data_pipeline(args):
     dataset = "seqfish_mouse"
-    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/export'
-    mkdir(data_root)
+    output_dir = f'{args.dataset_dir}/{dataset}/{dataset}/export'
+    mkdir(output_dir)
 
     adata = load_seqfish_mouse_data()
-    write_exchangeable_loom(adata,f'{data_root}/adata.loom')
+    adata_filtered, spatial_graph = preprocessing_data(args, adata)
+    write_exchangeable_loom(adata,f'{output_dir}/adata.loom')
 
-    locs = pd.DataFrame(adata.obsm["spatial"], columns=["x", "y"])
-    locs.to_csv(f"{data_root}/locs.tsv", sep="\t", index=False)
+    locs = pd.DataFrame(adata_filtered.obsm["spatial"], columns=["x", "y"])
+    locs.to_csv(f"{output_dir}/locs.tsv", sep="\t", index=False)
+
+    pcs = np.array(adata_filtered.obsm["X_pca"])
+    df_pcs = pd.DataFrame(pcs)
+    df_pcs.to_csv(f'{output_dir}/pcs.tsv', sep='\t', index=False)
+
+    sc.pp.neighbors(adata_filtered, n_neighbors=30)
+    sc.tl.leiden(adata_filtered, resolution=.3)
+
+    df_cluster = pd.DataFrame(np.array(adata_filtered.obs["leiden"]), columns=["leiden_label"])
+    df_cluster.to_csv(f'{output_dir}/leiden.tsv', sep='\t', index=False)
+
     print(f'===== Exported {dataset} =====')
 
 def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="seqfish_mouse", clustering_method="leiden", resolution=.3, n_neighbors=15, isTrain=True):
@@ -325,7 +399,8 @@ def basic_pipeline(args):
     # train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=30, isTrain=False)
     #plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
     # plot_pseudotime(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
-    plot_umap_comparison_with_coord_alpha(args, dataset, dataset)
+    # plot_umap_comparison_with_coord_alpha(args, dataset, dataset)
+    plot_pseudotime_comparison(args, adata_filtered, dataset, dataset)
 
 def expr_analysis_pipeline(args):
     dataset = "seqfish_mouse"

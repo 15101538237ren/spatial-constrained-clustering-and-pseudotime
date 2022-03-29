@@ -6,7 +6,7 @@ source("filter_non_human_genes.R")
 options(stringsAsFactors = FALSE)
 
 data_dir = "../data/Visium/Chicken_Dev/"
-fig_dir = "../output/chicken/Valve/DGI_SP"
+fig_dir = "../output/chicken_bk/Valve/DGI_SP"
 sample_name = "D10"
 anndata_fp = paste(c(data_dir, "preprocessed", sample_name, "anndata_pp.h5ad"), collapse = '/')
 annotation_fp = paste(c(data_dir, "preprocessed", sample_name, "cluster_anno.tsv"), collapse = '/')
@@ -62,12 +62,23 @@ groupSize <- as.numeric(table(cellchat@idents))
 valve_cells_numb <- c(16, 17)
 non_valve <- c(2,3,8,11,13)
 
-pdf(paste(c(fig_dir, "ccc_send_by_valve.pdf"), collapse = '/'), width=7, height=4, pointsize=12)
-netVisual_chord_gene(cellchat, sources.use = valve_cells_numb, targets.use = non_valve, color.use=colors_for_use, signaling = c("MK", "PTN", "CXCL", "ANGPT"), lab.cex = 0.5,legend.pos.y = 30, title.name = "L-R interactions from valve cells")#
+pathways.show <- c("MK") 
+par(mfrow=c(1,1))
+
+pairLR.MK <- extractEnrichedLR(cellchat, signaling = pathways.show, geneLR.return = FALSE)
+
+netVisual_aggregate(cellchat, signaling = pathways.show, layout = "circle")
+LR.show = c("MDK_SDC2")
+netVisual_individual(cellchat, signaling = pathways.show,
+                     sources.use= c("Valve-1","Valve-2"), targets.use=c(""), pairLR.use = LR.show, layout = "circle")
+
+
+pdf(paste(c(fig_dir, "ccc_send_by_valve_PTN.pdf"), collapse = '/'), width=7, height=4, pointsize=12)
+netVisual_chord_gene(cellchat, sources.use = valve_cells_numb, targets.use = non_valve, color.use=colors_for_use, signaling = c("PTN"), lab.cex = 0.5,legend.pos.y = 30, title.name = "Cell Cell signaling\nfrom valve cells")#
 dev.off()
 
-pdf(paste(c(fig_dir, "ccc_recv_by_valve.pdf"), collapse = '/'), width=7, height=4, pointsize=14)
-netVisual_chord_gene(cellchat, sources.use = non_valve, targets.use = valve_cells_numb, color.use=colors_for_use, signaling = c("MK", "PTN", "CXCL", "ANGPT"), lab.cex = 0.5,legend.pos.y = 30, title.name = "L-R interactions to valve cells")
+pdf(paste(c(fig_dir, "ccc_recv_by_valve_PTN.pdf"), collapse = '/'), width=7, height=4, pointsize=14)
+netVisual_chord_gene(cellchat, sources.use = non_valve, targets.use = valve_cells_numb, color.use=colors_for_use, signaling = c("PTN"), lab.cex = 0.5,legend.pos.y = 30, title.name = "Cell Cell signaling\nto valve cells")
 dev.off()
 netVisual_bubble(cellchat, sources.use = valve_cells_numb , targets.use = non_valve, signaling = c("MK", "PTN", "CXCL", "ANGPT"), remove.isolate = T, thresh = 0.01)
 netVisual_bubble(cellchat, sources.use = non_valve, targets.use = valve_cells_numb, signaling = c("MK", "PTN", "CXCL", "ANGPT"), remove.isolate = T, thresh = 0.01)
