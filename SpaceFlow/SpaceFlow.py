@@ -40,7 +40,7 @@ class SpaceFlow(object):
         """
         self.adata = anndata.AnnData(expr_data.astype(float))
         self.adata.obsm['spatial'] = spatial_locs.astype(float)
-
+        self.trained = False
     def preprocessing_data(self, n_top_genes=None):
         """
         Preprocessing the spatial transcriptomics data
