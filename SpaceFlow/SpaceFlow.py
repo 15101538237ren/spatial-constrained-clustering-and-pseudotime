@@ -40,7 +40,7 @@ class SpaceFlow(object):
         """
         self.adata = anndata.AnnData(expr_data.astype(float))
         self.adata.obsm['spatial'] = spatial_locs.astype(float)
-        self.trained = False
+
     def preprocessing_data(self, n_top_genes=None):
         """
         Preprocessing the spatial transcriptomics data
@@ -179,100 +179,114 @@ class SpaceFlow(object):
         print(f"Training complete!\nEmbedding is saved at {embedding_save_filepath}")
 
         self.embedding = embedding
-        self.trained = True
         return embedding
 
     def segmentation(self, domain_label_save_filepath="./domains.tsv", n_neighbors=50, resolution=1.0):
-        if not self.trained:
-            print("No embedding found, please ensure you have run train() method before segmentation!")
-            return
-        embedding_adata = anndata.AnnData(self.embedding)
-        sc.pp.neighbors(embedding_adata, n_neighbors=n_neighbors, use_rep='X')
-        sc.tl.leiden(embedding_adata, resolution=float(resolution))
-        domains = embedding_adata.obs["leiden"].cat.codes
+        error_message = "No embedding found, please ensure you have run train() method before segmentation!"
+        try:
+            print("Performing domain segmentation")
+            embedding_adata = anndata.AnnData(self.embedding)
+            sc.pp.neighbors(embedding_adata, n_neighbors=n_neighbors, use_rep='X')
+            sc.tl.leiden(embedding_adata, resolution=float(resolution))
+            domains = embedding_adata.obs["leiden"].cat.codes
 
-        save_dir = os.path.dirname(domain_label_save_filepath)
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        np.savetxt(domain_label_save_filepath, domains, fmt='%d', header='', footer='', comments='')
-        print(f"Segmentation complete, domain labels of cells or spots saved at {domain_label_save_filepath} !")
-        self.domains = domains
+            save_dir = os.path.dirname(domain_label_save_filepath)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            np.savetxt(domain_label_save_filepath, domains, fmt='%d', header='', footer='', comments='')
+            print(f"Segmentation complete, domain labels of cells or spots saved at {domain_label_save_filepath} !")
+            self.domains = domains
+
+        except NameError:
+            print(error_message)
+        except AttributeError:
+            print(error_message)
 
     def plot_segmentation(self, segmentation_figure_save_filepath="./domain_segmentation.pdf", cm=plt.get_cmap("tab20"), scatter_sz=1.):
-        fig, ax = figure(nrow=1, ncol=1)
-        pred_clusters = np.array(self.domains).astype(int)
-        if pred_clusters:
-            print("No segmentation data found, please ensure you have run the segmentation() method.")
-            return
-        uniq_pred = np.unique(pred_clusters)
-        n_cluster = len(uniq_pred)
-        x, y = self.adata_preprocessed.obsm["spatial"][:, 0], self.adata_preprocessed.obsm["spatial"][:, 1]
-        for cid, cluster in enumerate(uniq_pred):
-            color = cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
-            ind = pred_clusters == cluster
-            ax.scatter(x[ind], y[ind], s=scatter_sz, color=color, label=cluster, marker=".")
-        ax.set_facecolor("none")
+        error_message = "No segmentation data found, please ensure you have run the segmentation() method."
+        try:
+            fig, ax = figure(nrow=1, ncol=1)
+            pred_clusters = np.array(self.domains).astype(int)
+            uniq_pred = np.unique(pred_clusters)
+            n_cluster = len(uniq_pred)
+            x, y = self.adata_preprocessed.obsm["spatial"][:, 0], self.adata_preprocessed.obsm["spatial"][:, 1]
+            for cid, cluster in enumerate(uniq_pred):
+                color = cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
+                ind = pred_clusters == cluster
+                ax.scatter(x[ind], y[ind], s=scatter_sz, color=color, label=cluster, marker=".")
+            ax.set_facecolor("none")
 
-        ax.set_title("Domain Segmentation", fontsize=14)
-        box = ax.get_position()
-        height_ratio = 1.0
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
-        lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.1,
-                         borderaxespad=.1)
-        for handle in lgnd.legendHandles:
-            handle._sizes = [8]
+            ax.set_title("Domain Segmentation", fontsize=14)
+            box = ax.get_position()
+            height_ratio = 1.0
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
+            lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.1,
+                             borderaxespad=.1)
+            for handle in lgnd.legendHandles:
+                handle._sizes = [8]
 
-        save_dir = os.path.dirname(segmentation_figure_save_filepath)
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        plt.savefig(segmentation_figure_save_filepath, dpi=300)
-        plt.close('all')
+            save_dir = os.path.dirname(segmentation_figure_save_filepath)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            plt.savefig(segmentation_figure_save_filepath, dpi=300)
+            plt.close('all')
+        except NameError:
+            print(error_message)
+        except AttributeError:
+            print(error_message)
 
     def pseudo_Spatiotemporal_Map(self, pSM_values_save_filepath="./pSM_values.tsv", n_neighbors=20, resolution=1.0, cell_number_threshold_for_subsampling=5000):
-        if not self.trained:
-            print("No embedding found, please ensure you have run train() method before calculating pseudo-Spatiotemporal Map!")
-            return
-        adata = anndata.AnnData(self.embedding)
-        sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
-        sc.tl.umap(adata)
-        sc.tl.leiden(adata, resolution=resolution)
-        sc.tl.paga(adata)
-        if adata.shape[0] < cell_number_threshold_for_subsampling:
-            sub_adata_x = adata.X
-        else:
-            indices = np.arange(adata.shape[0])
-            selected_ind = np.random.choice(indices, cell_number_threshold_for_subsampling, False)
-            sub_adata_x = adata.X[selected_ind, :]
-        sum_dists = distance_matrix(sub_adata_x, sub_adata_x).sum(axis=1)
-        adata.uns['iroot'] = np.argmax(sum_dists)
-        sc.tl.diffmap(adata)
-        sc.tl.dpt(adata)
-        pSM_values = adata.obs['dpt_pseudotime'].to_numpy()
-        save_dir = os.path.dirname(pSM_values_save_filepath)
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        np.savetxt(pSM_values_save_filepath, pSM_values, fmt='%.5f', header='', footer='', comments='')
-        print(f"pseudo-Spatiotemporal Map(pSM) calculation complete, pSM values of cells or spots saved at {pSM_values_save_filepath}!")
-        self.pSM_values = pSM_values
+        error_message = "No embedding found, please ensure you have run train() method before calculating pseudo-Spatiotemporal Map!"
+        try:
+            print("Performing pseudo-Spatiotemporal Map")
+            adata = anndata.AnnData(self.embedding)
+            sc.pp.neighbors(adata, n_neighbors=n_neighbors, use_rep='X')
+            sc.tl.umap(adata)
+            sc.tl.leiden(adata, resolution=resolution)
+            sc.tl.paga(adata)
+            if adata.shape[0] < cell_number_threshold_for_subsampling:
+                sub_adata_x = adata.X
+            else:
+                indices = np.arange(adata.shape[0])
+                selected_ind = np.random.choice(indices, cell_number_threshold_for_subsampling, False)
+                sub_adata_x = adata.X[selected_ind, :]
+            sum_dists = distance_matrix(sub_adata_x, sub_adata_x).sum(axis=1)
+            adata.uns['iroot'] = np.argmax(sum_dists)
+            sc.tl.diffmap(adata)
+            sc.tl.dpt(adata)
+            pSM_values = adata.obs['dpt_pseudotime'].to_numpy()
+            save_dir = os.path.dirname(pSM_values_save_filepath)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            np.savetxt(pSM_values_save_filepath, pSM_values, fmt='%.5f', header='', footer='', comments='')
+            print(f"pseudo-Spatiotemporal Map(pSM) calculation complete, pSM values of cells or spots saved at {pSM_values_save_filepath}!")
+            self.pSM_values = pSM_values
+        except NameError:
+            print(error_message)
+        except AttributeError:
+            print(error_message)
 
     def plot_pSM(self, segmentation_figure_save_filepath="./domain_segmentation.pdf", cm = plt.get_cmap("gist_rainbow"), scatter_sz=1.):
-        fig, ax = figure(nrow=1, ncol=1)
-        if self.pSM_values:
-            print("No segmentation data found, please ensure you have run the segmentation() method.")
-            return
-        x, y = self.adata_preprocessed.obsm["spatial"][:, 0], self.adata_preprocessed.obsm["spatial"][:, 1]
-        st = ax.scatter(x, y, s=scatter_sz, c=self.pSM_values, cmap=cm, marker=".")
-        ax.invert_yaxis()
-        clb = fig.colorbar(st)
-        clb.ax.set_ylabel("pseudotime", labelpad=10, rotation=270, fontsize=10, weight='bold')
-        ax.set_title("pseudo-Spatiotemporal Map", fontsize=14)
-        ax.set_facecolor("none")
+        error_message = "No segmentation data found, please ensure you have run the segmentation() method."
+        try:
+            fig, ax = figure(nrow=1, ncol=1)
+            x, y = self.adata_preprocessed.obsm["spatial"][:, 0], self.adata_preprocessed.obsm["spatial"][:, 1]
+            st = ax.scatter(x, y, s=scatter_sz, c=self.pSM_values, cmap=cm, marker=".")
+            ax.invert_yaxis()
+            clb = fig.colorbar(st)
+            clb.ax.set_ylabel("pseudotime", labelpad=10, rotation=270, fontsize=10, weight='bold')
+            ax.set_title("pseudo-Spatiotemporal Map", fontsize=14)
+            ax.set_facecolor("none")
 
-        save_dir = os.path.dirname(segmentation_figure_save_filepath)
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        plt.savefig(segmentation_figure_save_filepath, dpi=300)
-        plt.close('all')
+            save_dir = os.path.dirname(segmentation_figure_save_filepath)
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            plt.savefig(segmentation_figure_save_filepath, dpi=300)
+            plt.close('all')
+        except NameError:
+            print(error_message)
+        except AttributeError:
+            print(error_message)
 
 class GraphEncoder(nn.Module):
     def __init__(self, in_channels, hidden_channels):
