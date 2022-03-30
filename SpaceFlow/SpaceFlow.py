@@ -206,6 +206,7 @@ class SpaceFlow(object):
         error_message = "No segmentation data found, please ensure you have run the segmentation() method."
         try:
             fig, ax = figure(nrow=1, ncol=1)
+
             pred_clusters = np.array(self.domains).astype(int)
             uniq_pred = np.unique(pred_clusters)
             n_cluster = len(uniq_pred)
@@ -215,7 +216,7 @@ class SpaceFlow(object):
                 ind = pred_clusters == cluster
                 ax.scatter(x[ind], y[ind], s=scatter_sz, color=color, label=cluster, marker=".")
             ax.set_facecolor("none")
-
+            ax.invert_yaxis()
             ax.set_title("Domain Segmentation", fontsize=14)
             box = ax.get_position()
             height_ratio = 1.0
@@ -228,7 +229,7 @@ class SpaceFlow(object):
             save_dir = os.path.dirname(segmentation_figure_save_filepath)
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
-            ax.show()
+            plt.show()
             plt.savefig(segmentation_figure_save_filepath, dpi=300)
             print(f"Plotting complete, segmentation figure saved at {segmentation_figure_save_filepath} !")
             plt.close('all')
@@ -283,7 +284,7 @@ class SpaceFlow(object):
             save_dir = os.path.dirname(pSM_figure_save_filepath)
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
-            ax.show()
+            plt.show()
             plt.savefig(pSM_figure_save_filepath, dpi=300)
             print(f"Plotting complete, pseudo-Spatiotemporal Map figure saved at {pSM_figure_save_filepath} !")
             plt.close('all')
