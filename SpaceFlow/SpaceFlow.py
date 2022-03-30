@@ -164,8 +164,7 @@ class SpaceFlow(object):
                 min_loss = train_loss
                 best_params = model.state_dict()
             if epoch % 10 == 1:
-                print("Epoch %d/%d" % (epoch + 1, epochs))
-                print("Loss:" + str(train_loss))
+                print(f"Epoch {epoch + 1}/{epochs}, Loss: {str(train_loss)}")
             if patience > max_patience and epoch > min_stop:
                 break
 
@@ -180,10 +179,11 @@ class SpaceFlow(object):
         print(f"Training complete!\nEmbedding is saved at {embedding_save_filepath}")
 
         self.embedding = embedding
+        self.trained = True
         return embedding
 
     def segmentation(self, domain_label_save_filepath="./domains.tsv", n_neighbors=50, resolution=1.0):
-        if not self.embedding:
+        if not self.trained:
             print("No embedding found, please ensure you have run train() method before segmentation!")
             return
         embedding_adata = anndata.AnnData(self.embedding)
@@ -229,7 +229,7 @@ class SpaceFlow(object):
         plt.close('all')
 
     def pseudo_Spatiotemporal_Map(self, pSM_values_save_filepath="./pSM_values.tsv", n_neighbors=20, resolution=1.0, cell_number_threshold_for_subsampling=5000):
-        if not self.embedding:
+        if not self.trained:
             print("No embedding found, please ensure you have run train() method before calculating pseudo-Spatiotemporal Map!")
             return
         adata = anndata.AnnData(self.embedding)
