@@ -127,7 +127,7 @@ Parameters:
 - `n_neighbors`: the number of the nearest neighbors for each cell for constructing the graph for Leiden using the embedding as input. (default: 50)
 - `resolution`: the resolution of the Leiden clustering, the larger the coarser of the domains. (default: 1.0)
 
-#### 7. Visualization of the identified spatial domains
+#### 7. Visualization of the annotation and the identified spatial domains
 
 We next plot the spatial domains using the identified domain labels and spatial coordinates of cells.
 
@@ -137,8 +137,16 @@ sf.plot_segmentation(segmentation_figure_save_filepath="./domain_segmentation.pd
                      scatter_sz=1.)
 ```
 
-The expected output is like below:
+We can also visualize the expert annotation for comparison by:
 
+```python
+import scanpy as sc
+sc.pl.spatial(adata, 
+    color="celltype_mapped_refined",
+    spot_size=0.03)
+```
+
+The expected output is like below:
 ![Domain Segmentation](images/domain_segmentation.png)
 
 Parameters:
