@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import math
 import os
 import torch
 import random
@@ -202,7 +203,7 @@ class SpaceFlow(object):
         except AttributeError:
             print(error_message)
 
-    def plot_segmentation(self, segmentation_figure_save_filepath="./domain_segmentation.pdf", cm=plt.get_cmap("tab20"), scatter_sz=1.):
+    def plot_segmentation(self, segmentation_figure_save_filepath="./domain_segmentation.pdf", colormap="tab20", scatter_sz=1.):
         error_message = "No segmentation data found, please ensure you have run the segmentation() method."
         try:
             fig, ax = figure(nrow=1, ncol=1)
@@ -211,18 +212,19 @@ class SpaceFlow(object):
             uniq_pred = np.unique(pred_clusters)
             n_cluster = len(uniq_pred)
             x, y = self.adata_preprocessed.obsm["spatial"][:, 0], self.adata_preprocessed.obsm["spatial"][:, 1]
+            cmap = plt.get_cmap(colormap)
             for cid, cluster in enumerate(uniq_pred):
-                color = cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
+                color = cmap((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
                 ind = pred_clusters == cluster
                 ax.scatter(x[ind], y[ind], s=scatter_sz, color=color, label=cluster, marker=".")
             ax.set_facecolor("none")
             ax.invert_yaxis()
             ax.set_title("Domain Segmentation", fontsize=14)
             box = ax.get_position()
-            height_ratio = 1.0
+            height_ratio = .8
             ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
             lgnd = ax.legend(loc='center left', fontsize=8, bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.1,
-                             borderaxespad=.1)
+                             borderaxespad=.1, ncol=int(math.ceil(n_cluster/10)))
             for handle in lgnd.legendHandles:
                 handle._sizes = [8]
 
@@ -269,12 +271,12 @@ class SpaceFlow(object):
         except AttributeError:
             print(error_message)
 
-    def plot_pSM(self, pSM_figure_save_filepath="./pseudo-Spatiotemporal-Map.pdf", cm = plt.get_cmap("gist_rainbow"), scatter_sz=1.):
+    def plot_pSM(self, pSM_figure_save_filepath="./pseudo-Spatiotemporal-Map.pdf", colormap="gist_rainbow", scatter_sz=1.):
         error_message = "No segmentation data found, please ensure you have run the segmentation() method."
         try:
             fig, ax = figure(nrow=1, ncol=1)
             x, y = self.adata_preprocessed.obsm["spatial"][:, 0], self.adata_preprocessed.obsm["spatial"][:, 1]
-            st = ax.scatter(x, y, s=scatter_sz, c=self.pSM_values, cmap=cm, marker=".")
+            st = ax.scatter(x, y, s=scatter_sz, c=self.pSM_values, cmap=plt.get_cmap(colormap), marker=".")
             ax.invert_yaxis()
             clb = fig.colorbar(st)
             clb.ax.set_ylabel("pseudotime", labelpad=10, rotation=270, fontsize=10, weight='bold')

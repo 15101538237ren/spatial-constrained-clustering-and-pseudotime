@@ -117,10 +117,42 @@ Parameters:
 We next plot the spatial domains using the identified domain labels and spatial coordinates of cells.
 
 ```python
-sf.plot_segmentation(segmentation_figure_save_filepath="./domain_segmentation.pdf", cm=plt.get_cmap("tab20"), scatter_sz=1.)
+sf.plot_segmentation(segmentation_figure_save_filepath="./domain_segmentation.pdf", colormap="tab20", scatter_sz=1.)
 ```
 
 The expected output is like below:
 
 ![Domain Segmentation](https://github.com/15101538237ren/spatial-constrained-clustering-and-pseudotime/blob/master/images/domain_segmentation.png)
 
+Parameters:
+- `segmentation_figure_save_filepath`: the file path for saving the figure of the spatial domain visualization. (default: "./domain_segmentation.pdf")
+- `colormap`: the colormap of the different domains, full colormap options see [matplotlib](https://matplotlib.org/3.5.1/tutorials/colors/colormaps.html)
+- `scatter_sz`: the marker size in points. (default: 1.0)
+
+#### 8. Idenfify the spatiotemporal patterns of the ST data through pseudo-Spatiotemporal Map (pSM)
+
+Next, we apply the diffusion pseudotime (dpt) algorithm to the learned spatially-consistent embedding to generate a pseudo-Spatiotemporal Map (pSM). This pSM represents a spatially-coherent pseudotime ordering of cells that encodes biological relationships between cells, such as developmental trajectories and cancer progression
+```python
+sf.pseudo_Spatiotemporal_Map(pSM_values_save_filepath="./pSM_values.tsv", n_neighbors=20, resolution=1.0, cell_number_threshold_for_subsampling=5000)
+```
+Parameters:
+- `pSM_values_save_filepath` : the file path for saving the inferred pSM values. 
+- `n_neighbors`: the number of the nearest neighbors for each cell for constructing the graph for Leiden using the embedding as input. (default: 20)  
+- `resolution`: the resolution of the Leiden clustering, the larger the coarser of the domains. (default: 1.0)
+- `cell_number_threshold_for_subsampling`: the threshold for the number of cells to subsampling for identifying the root cell. If the cell number is larger than this threshold, a cell population with `cell_number_threshold_for_subsampling` size will be randomly selected to infer the root cell. (default: 5000)
+
+#### 9. Visualization of the identified pseudo-Spatiotemporal Map (pSM)
+
+We next visualize the identified pseudo-Spatiotemporal Map (pSM).
+
+```python
+sf.plot_pSM(pSM_figure_save_filepath="./pseudo-Spatiotemporal-Map.pdf", colormap="gist_rainbow", scatter_sz=1.)
+```
+
+The expected output is like below: 
+ ![pSM](https://github.com/15101538237ren/spatial-constrained-clustering-and-pseudotime/blob/master/images/pSM.png)
+
+Parameters:
+- `pSM_figure_save_filepath`: the file path for saving the figure of the pSM visualization. (default: "./pseudo-Spatiotemporal-Map.pdf")
+- `colormap`:  the colormap of the pSM, full colormap options see [matplotlib](https://matplotlib.org/3.5.1/tutorials/colors/colormaps.html)
+-  `scatter_sz`: the marker size in points. (default: 1.0)   
