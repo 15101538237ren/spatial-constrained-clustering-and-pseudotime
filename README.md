@@ -62,7 +62,8 @@ adata = sq.datasets.seqfish()
 We create a SpaceFlow object using the count matrix of gene expression and the corresponding spatial locations of cells (or spots):
 
 ```python
-sf = SpaceFlow.SpaceFlow(expr_data=adata.X, spatial_locs=adata.obsm['spatial'])
+sf = SpaceFlow.SpaceFlow(expr_data=adata.X, 
+                         spatial_locs=adata.obsm['spatial'])
 ```
 Parameters:
 - `expr_data`: the count matrix of gene expression, 2D numpy array of size (# of cells, # of genes)
@@ -84,7 +85,14 @@ The preprocessing includes the normalization and log-transformation of the expre
 We then train a spatially regularized deep graph network model to learn a low-dimensional embedding that reflecting both expression similarity and the spatial proximity of cells in ST data.  
 
 ```python
-sf.train(spatial_regularization_strength=0.1, z_dim=50, lr=0.001, epochs=1000, max_patience=50, min_stop=100, random_seed=42, gpu=0)
+sf.train(spatial_regularization_strength=0.1, 
+         z_dim=50, 
+         lr=0.001, 
+         epochs=1000, 
+         max_patience=50, 
+         min_stop=100, 
+         random_seed=42, 
+         gpu=0)
 ```
 
 Parameters:
@@ -104,7 +112,9 @@ After the model training, the learned low-dimensional embedding can be accessed 
 SpaceFlow will use this learned embedding to identify the spatial domains based on [Leiden](https://www.nature.com/articles/s41598-019-41695-z) algorithm. 
 
 ```python
-sf.segmentation(domain_label_save_filepath="./domains.tsv", n_neighbors=50, resolution=1.0)
+sf.segmentation(domain_label_save_filepath="./domains.tsv", 
+                n_neighbors=50, 
+                resolution=1.0)
 ```
 Parameters:
 
@@ -117,7 +127,9 @@ Parameters:
 We next plot the spatial domains using the identified domain labels and spatial coordinates of cells.
 
 ```python
-sf.plot_segmentation(segmentation_figure_save_filepath="./domain_segmentation.pdf", colormap="tab20", scatter_sz=1.)
+sf.plot_segmentation(segmentation_figure_save_filepath="./domain_segmentation.pdf", 
+                     colormap="tab20", 
+                     scatter_sz=1.)
 ```
 
 The expected output is like below:
@@ -133,7 +145,10 @@ Parameters:
 
 Next, we apply the diffusion pseudotime (dpt) algorithm to the learned spatially-consistent embedding to generate a pseudo-Spatiotemporal Map (pSM). This pSM represents a spatially-coherent pseudotime ordering of cells that encodes biological relationships between cells, such as developmental trajectories and cancer progression
 ```python
-sf.pseudo_Spatiotemporal_Map(pSM_values_save_filepath="./pSM_values.tsv", n_neighbors=20, resolution=1.0, cell_number_threshold_for_subsampling=5000)
+sf.pseudo_Spatiotemporal_Map(pSM_values_save_filepath="./pSM_values.tsv", 
+                             n_neighbors=20, 
+                             resolution=1.0, 
+                             cell_number_threshold_for_subsampling=5000)
 ```
 Parameters:
 - `pSM_values_save_filepath` : the file path for saving the inferred pSM values. 
@@ -146,7 +161,9 @@ Parameters:
 We next visualize the identified pseudo-Spatiotemporal Map (pSM).
 
 ```python
-sf.plot_pSM(pSM_figure_save_filepath="./pseudo-Spatiotemporal-Map.pdf", colormap="gist_rainbow", scatter_sz=1.)
+sf.plot_pSM(pSM_figure_save_filepath="./pseudo-Spatiotemporal-Map.pdf", 
+            colormap="gist_rainbow", 
+            scatter_sz=1.)
 ```
 
 The expected output is like below: 
