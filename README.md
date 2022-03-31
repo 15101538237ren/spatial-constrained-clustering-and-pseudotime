@@ -138,18 +138,18 @@ sf.plot_segmentation(segmentation_figure_save_filepath="./domain_segmentation.pd
 ```
 
 The expected output is:
+
 ![Domain Segmentation](images/domain_segmentation.png)
 
 We can also visualize the expert annotation for comparison by:
 
 ```python
 import scanpy as sc
-sc.pl.spatial(adata, 
-    color="celltype_mapped_refined",
-    spot_size=0.03)
+sc.pl.spatial(adata, color="celltype_mapped_refined", spot_size=0.03)
 ```
 
 The expected output is:
+
 ![Expert Annotation](images/annotation.png)
 
 Parameters:
