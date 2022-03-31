@@ -23,10 +23,16 @@ You can deactivate the `spaceflow_env` environment anytime by:
 conda deactivate
 ```
 
-### 2. Install dependencies
+### 2. Install Pytorch and dependencies
 SpaceFlow depends on several packages, such as: [torch](https://pytorch.org/), [numpy](https://numpy.org/), [scipy](https://scipy.org/), [networkx](https://networkx.org/), etc. See a full list of the dependencies in `requirements.txt` file.
 
-Before install the SpaceFlow, dependencies need be installed through:
+Before install the SpaceFlow, we first need to install `Pytorch` by:
+
+```bash
+pip install --user torch==1.9.0 
+```
+
+Then, we install other dependencies through:
 ```bash
 pip install --user --requirement requirements.txt
 ```
