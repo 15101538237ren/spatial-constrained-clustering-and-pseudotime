@@ -121,5 +121,6 @@ sf.plot_segmentation(segmentation_figure_save_filepath="./domain_segmentation.pd
 ```
 
 The expected output is like below:
+
 ![Domain Segmentation](https://github.com/15101538237ren/spatial-constrained-clustering-and-pseudotime/blob/master/images/domain_segmentation.png)
 
