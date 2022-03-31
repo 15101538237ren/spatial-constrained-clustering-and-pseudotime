@@ -150,7 +150,8 @@ sf.plot_pSM(pSM_figure_save_filepath="./pseudo-Spatiotemporal-Map.pdf", colormap
 ```
 
 The expected output is like below: 
- ![pSM](https://github.com/15101538237ren/spatial-constrained-clustering-and-pseudotime/blob/master/images/pSM.png)
+ 
+![pSM](https://github.com/15101538237ren/spatial-constrained-clustering-and-pseudotime/blob/master/images/pSM.png)
 
 Parameters:
 - `pSM_figure_save_filepath`: the file path for saving the figure of the pSM visualization. (default: "./pseudo-Spatiotemporal-Map.pdf")
