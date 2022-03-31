@@ -18,7 +18,6 @@ After create the environment, you can activate the `spaceflow_env` environment b
 ```bash
 conda activate spaceflow_env
 ```
-
 You can deactivate the `spaceflow_env` environment anytime by:
 ```bash
 conda deactivate
