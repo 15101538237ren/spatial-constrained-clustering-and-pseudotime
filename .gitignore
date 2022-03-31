@@ -6,7 +6,6 @@ figures
 python_codes/figures/
 *.pdf
 *.ai
-*.png
 *.csv
 *.tsv
 
