@@ -175,3 +175,6 @@ Parameters:
 - `pSM_figure_save_filepath`: the file path for saving the figure of the pSM visualization. (default: "./pseudo-Spatiotemporal-Map.pdf")
 - `colormap`:  the colormap of the pSM, full colormap options see [matplotlib](https://matplotlib.org/3.5.1/tutorials/colors/colormaps.html)
 -  `scatter_sz`: the marker size in points. (default: 1.0)   
+
+## Contact
+If you have any questions or found any issues, please contact: [hongleir@uci.edu](mailto:hongleir@uci.edu).
