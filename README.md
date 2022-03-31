@@ -137,6 +137,9 @@ sf.plot_segmentation(segmentation_figure_save_filepath="./domain_segmentation.pd
                      scatter_sz=1.)
 ```
 
+The expected output is:
+![Domain Segmentation](images/domain_segmentation.png)
+
 We can also visualize the expert annotation for comparison by:
 
 ```python
@@ -146,8 +149,8 @@ sc.pl.spatial(adata,
     spot_size=0.03)
 ```
 
-The expected output is like below:
-![Domain Segmentation](images/domain_segmentation.png)
+The expected output is:
+![Expert Annotation](images/annotation.png)
 
 Parameters:
 - `segmentation_figure_save_filepath`: the file path for saving the figure of the spatial domain visualization. (default: "./domain_segmentation.pdf")
