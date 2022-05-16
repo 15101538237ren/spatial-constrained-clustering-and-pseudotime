@@ -41,7 +41,7 @@ class SEDR_Train:
         self.params = params
         self.device = params.device
         self.epochs = params.epochs
-        self.node_X = torch.tensor(node_X).float().to(self.device)
+        self.node_X = torch.tensor(node_X.copy()).float().to(self.device)
         self.adj_norm = graph_dict["adj_norm"].to(self.device)
         self.adj_label = graph_dict["adj_label"].to(self.device)
         self.norm_value = graph_dict["norm_value"]

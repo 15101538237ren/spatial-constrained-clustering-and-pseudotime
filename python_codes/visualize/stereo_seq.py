@@ -3,7 +3,7 @@ import os, math, shutil
 from scipy.spatial import distance_matrix
 from scipy.stats import pearsonr
 import matplotlib.patches as patches
-#from python_codes.train.train import train
+from python_codes.train.train import train
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
 from python_codes.util.util import load_stereo_seq_data, preprocessing_data, save_preprocessed_data, load_preprocessed_data, save_features
@@ -339,7 +339,7 @@ def plot_pseudotime_comparison(args, sample_name, dataset, cm = plt.get_cmap("gi
     plt.close('all')
 
 def plot_clustering_comparison(args, sample_name, dataset, scatter_sz=1., cm= plt.get_cmap("tab10"), cluster_method="leiden"):
-    methods = ["Seurat", "scanpy", "DGI", "DGI_SP"] #
+    methods = ["Seurat", "MERINGUE", "DGI", "DGI_SP"] #"scanpy"
     nrow, ncol = 1, len(methods)
 
     data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
@@ -365,7 +365,7 @@ def plot_clustering_comparison(args, sample_name, dataset, scatter_sz=1., cm= pl
     coord_sedr = adata_filtered_sedr.obsm['spatial'].astype(float)
     x_sedr, y_sedr = coord_sedr[:, 0], coord_sedr[:, 1]
 
-    fig, axs = figure(nrow, ncol, rsz=6, csz=6, wspace=.05, hspace=.1, left=.05, right=.95)
+    fig, axs = figure(nrow, ncol, rsz=6, csz=6.2, wspace=.15, hspace=.1, left=.05, right=.95)
 
     for mid, method in enumerate(methods):
         print(f"Processing {sample_name} {method}")
@@ -375,7 +375,8 @@ def plot_clustering_comparison(args, sample_name, dataset, scatter_sz=1., cm= pl
         ax.axis('off')
         output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
         mkdir(output_dir)
-        df = pd.read_csv(f"{output_dir}/metadata.tsv", sep="\t")["seurat_clusters"] if method == "Seurat" else pd.read_csv(f"{output_dir}/{cluster_method}.tsv", header=None)
+        field_name = "seurat_clusters" if method == "Seurat" else "clusters"
+        df = pd.read_csv(f"{output_dir}/metadata.tsv", sep="\t")[field_name] if method in ["Seurat", "MERINGUE"] else pd.read_csv(f"{output_dir}/{cluster_method}.tsv", header=None)
         pred_clusters = df.values.flatten().astype(int)
         uniq_pred = np.unique(pred_clusters)
         n_cluster = len(uniq_pred)
@@ -401,19 +402,19 @@ def plot_clustering_comparison(args, sample_name, dataset, scatter_sz=1., cm= pl
         box = ax.get_position()
         height_ratio = 1.0
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
-        lgnd = ax.legend(loc='center left', fontsize=20, bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.1,
-                         borderaxespad=.05, markerscale=16.)
+        ncolumn = 2 if method == "MERINGUE" else 1
+        lgnd = ax.legend(loc='center left', fontsize=20, bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.05,
+                         borderaxespad=.05, markerscale=16., ncol=ncolumn, columnspacing=.3, borderpad=.4, handlelength=1.5)
         for handle in lgnd.legendHandles:
             handle._sizes = [100]
         method = "SpaceFlow" if mid == len(methods) - 1 else method
-        method = method.capitalize() if method != "DGI" else method
         ax.set_title(method, fontsize=title_sz + 22, pad=10)
     fig_fp = f"{output_dir}/cluster_comparison.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
 def plot_clustering_comparison_zoomed(args, sample_name, dataset, scatter_sz=15., cm= plt.get_cmap("tab10"), cluster_method="leiden"):
-    methods = ["Seurat", "scanpy", "DGI", "DGI_SP"] #
+    methods = ["Seurat", "MERINGUE", "DGI", "DGI_SP"]  # "scanpy"
     nrow, ncol = 1, len(methods)
 
     data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
@@ -449,7 +450,8 @@ def plot_clustering_comparison_zoomed(args, sample_name, dataset, scatter_sz=15.
         ax.axis('off')
         output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
         mkdir(output_dir)
-        df = pd.read_csv(f"{output_dir}/metadata.tsv", sep="\t")["seurat_clusters"] if method == "Seurat" else pd.read_csv(f"{output_dir}/{cluster_method}.tsv", header=None)
+        field_name = "seurat_clusters" if method == "Seurat" else "clusters"
+        df = pd.read_csv(f"{output_dir}/metadata.tsv", sep="\t")[field_name] if method in ["Seurat", "MERINGUE"] else pd.read_csv(f"{output_dir}/{cluster_method}.tsv", header=None)
         pred_clusters = df.values.flatten().astype(int)
         uniq_pred = np.unique(pred_clusters)
         n_cluster = len(uniq_pred)
@@ -475,7 +477,6 @@ def plot_clustering_comparison_zoomed(args, sample_name, dataset, scatter_sz=15.
         # for handle in lgnd.legendHandles:
         #     handle._sizes = [100]
         method = "SpaceFlow" if mid == len(methods) - 1 else method
-        method = method.capitalize() if method != "DGI" else method
         ax.set_title(method, fontsize=title_sz + 6, pad=10)
     fig_fp = f"{output_dir}/cluster_comparison_zoomed.pdf"
     plt.savefig(fig_fp, dpi=300)
@@ -604,7 +605,7 @@ def get_resolution(args,sample_name, dataset="stereo_seq", clustering_method="le
     return resolution
 
 def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="stereo_seq", clustering_method="leiden", resolution=1.0, n_neighbors=15, isTrain=True):
-    for spatial in [False]:#, True
+    for spatial in [True]:#False,
         args.spatial = spatial
         if isTrain:
             embedding = train(args, adata_filtered, spatial_graph)
@@ -617,22 +618,22 @@ def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="st
 def basic_pipeline(args):
     dataset = "stereo_seq"
 
-    # print(f'===== Data: {dataset} =====')
-    # data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
-    # if os.path.exists(f"{data_root}/adata.h5ad"):
-    #     adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
-    # else:
-    #     adata = load_stereo_seq_data(args)
-    #     adata_filtered, spatial_graph = preprocessing_data(args, adata)
-    #     save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+    print(f'===== Data: {dataset} =====')
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
+    if os.path.exists(f"{data_root}/adata.h5ad"):
+        adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
+    else:
+        adata = load_stereo_seq_data(args)
+        adata_filtered, spatial_graph = preprocessing_data(args, adata)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
 
-    # train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=20, isTrain=False)
+    train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=20, isTrain=True)
     #plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1.5)
     # plot_pseudotime(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
     # plot_umap_comparison_with_coord_alpha(args, dataset, dataset)
-    plot_pseudotime_comparison(args, dataset, dataset)
-    # plot_clustering_comparison(args, dataset, dataset)
-    #plot_clustering_comparison_zoomed(args, dataset, dataset)
+    # plot_pseudotime_comparison(args, dataset, dataset)
+    #plot_clustering_comparison(args, dataset, dataset)
+    plot_clustering_comparison_zoomed(args, dataset, dataset)
 
 def corr_expr_analysis_pipeline(args):
     dataset = "stereo_seq"

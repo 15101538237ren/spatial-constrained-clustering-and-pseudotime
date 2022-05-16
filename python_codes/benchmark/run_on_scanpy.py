@@ -152,7 +152,7 @@ def basic_pipeline(args):
     args.dataset_dir = f'../../data'
     args.output_dir = f'../../output'
     n_neighbors = 15
-    datasets = ["stereo_seq"] #, "slideseq_v2","seqfish_mouse"
+    datasets = ["stereo_seq", "slideseq_v2","seqfish_mouse"]#] #,
     for dataset in datasets:
         print(f'===== Data {dataset} =====')
         data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
@@ -161,9 +161,10 @@ def basic_pipeline(args):
         else:
             adata = load_datasets(args, dataset)
             adata_filtered, spatial_graph = preprocessing_data(args, adata)
-            save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
-        sc.tl.pca(adata_filtered, svd_solver='arpack')
-        scanpy_clustering(args, adata_filtered, dataset, dataset, "leiden", n_neighbors=n_neighbors, ncluster=8)
+        print(adata_filtered.shape)
+        #     save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+        # sc.tl.pca(adata_filtered, svd_solver='arpack')
+        # scanpy_clustering(args, adata_filtered, dataset, dataset, "leiden", n_neighbors=n_neighbors, ncluster=8)
         #scanpy_pseudotime(args, adata_filtered, dataset, dataset, n_neighbors=n_neighbors, resolution=resolution)
         #scanpy_pca(args, adata_filtered, dataset, dataset)
         # plot_clustering(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)

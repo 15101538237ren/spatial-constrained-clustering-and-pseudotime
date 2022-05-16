@@ -11,14 +11,14 @@ for i in "${!samples[@]}"; do
 	n_clusters="${clusters[i]}"
   	echo "sample: "$sample " cluster:"$n_clusters
   	#python DLPFC_SpaGCN.py $sample $n_clusters &
-	python DLPFC_stLearn.py $sample &
+	# python DLPFC_stLearn.py $sample &
 	# Rscript DLPFC_Seurat.R $sample $n_clusters
 	# Rscript DLPFC_BayesSpace.R $sample $n_clusters
 	#Rscript DLPFC_Giotto.R $sample $n_clusters
 	#Rscript DLPFC_comp.R $sample
 done
 
-#Rscript DLPFC.ARI_boxplot.R
+Rscript DLPFC.ARI_boxplot.R
 
 
 

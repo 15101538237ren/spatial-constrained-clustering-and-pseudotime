@@ -403,7 +403,7 @@ def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", da
         ind = pred_clusters == cluster
         ax.scatter(x[ind], y[ind], s=scatter_sz, color=color_dict_for_cluster[cluster], label=cluster)
 
-    ax.set_title("SpaceFlow", fontsize=title_sz)
+    ax.set_title("SpaceFlow\n(Segmentation)", fontsize=title_sz)
     ax.legend(fontsize=8, loc='center left', bbox_to_anchor=(1.0, 0.5))
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
@@ -418,22 +418,23 @@ def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", da
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%")
     clb = fig.colorbar(st, cax=cax)
-    clb.ax.set_ylabel("PST Score", labelpad=10, rotation=270, fontsize=8, weight='bold')
-    ax.set_title("PST Map", fontsize=title_sz)
+    clb.ax.set_ylabel("pSM value", labelpad=10, rotation=270, fontsize=8, weight='bold')
+    ax.set_title("SpaceFlow\n(pSM)", fontsize=title_sz)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     ax.invert_yaxis()
 
     ax = axs[4]
     ax.imshow(img, alpha=alpha)
-    pseudotimes = pd.read_csv(f"{args.output_dir}/{dataset}/{sample_name}/monocole/pseudotime.tsv", header=None).values.flatten().astype(float)
+    method = "stLearn" #"monocole"
+    pseudotimes = pd.read_csv(f"{args.output_dir}/{dataset}/{sample_name}/{method}/pseudotime.tsv", header=None).values.flatten().astype(float)
     pseudo_time_cm = plt.get_cmap("gist_rainbow")
     st = ax.scatter(x, y, s=scatter_sz, c=pseudotimes, cmap=pseudo_time_cm)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%")
     clb = fig.colorbar(st, cax=cax)
     clb.ax.set_ylabel("pseudotime", labelpad=10, rotation=270, fontsize=8, weight='bold')
-    ax.set_title("Monocole", fontsize=title_sz)
+    ax.set_title(f"{method}\n(pseudotime)", fontsize=title_sz)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     ax.invert_yaxis()
@@ -955,7 +956,7 @@ def figure_pipeline(args):
         plot_clustering_and_pseudotime(args, adata, sample_name, scatter_sz=5)
         # adata_filtered = train_pipeline(args, adata, sample_name, n_neighbors=5, isTrain=False)
         # plot_clustering(args, adata, sample_name, scatter_sz=3, annotation=False, scale=1)
-        plot_pseudotime(args, adata, sample_name)
+        # plot_pseudotime(args, adata, sample_name)
 
 def calc_pseudotime_corr_genes(args, adata, sample_name, dataset, n_top=16):
     original_spatial = args.spatial

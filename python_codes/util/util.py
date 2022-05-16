@@ -140,10 +140,10 @@ def preprocessing_data_sedr(args, adata, min_cells=3, pca_n_comps=300):
     sc.pp.scale(adata)
     sc.pp.pca(adata, n_comps=pca_n_comps)
     coords = adata.obsm['spatial']
-    cut = estimate_cutoff_knn(coords, k=args.n_neighbors_for_knn_graph)
-    spatial_graph = graph_alpha(coords, cut=cut, n_layer=args.alpha_n_layer)
+    # cut = estimate_cutoff_knn(coords, k=args.n_neighbors_for_knn_graph)
+    # spatial_graph = graph_alpha(coords, cut=cut, n_layer=args.alpha_n_layer)
     print('adata after filtered: (' + str(adata.shape[0]) + ', ' + str(adata.shape[1]) + ')')
-    return adata, spatial_graph
+    return adata
 
 def estimate_cutoff_knn(pts, k=10):
     A_knn = kneighbors_graph(pts, n_neighbors=k, mode='distance')

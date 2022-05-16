@@ -50,11 +50,11 @@ def get_params():
     np.random.seed(0)
     torch.manual_seed(0)
     torch.cuda.manual_seed(0)
-    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda:6' if torch.cuda.is_available() else 'cpu'
     print('===== Using device: ' + device)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--k', type=int, default=10, help='parameter k in spatial graph')
+    parser.add_argument('--k', type=int, default=15, help='parameter k in spatial graph')
     parser.add_argument('--knn_distanceType', type=str, default='euclidean',
                         help='graph distance type: euclidean/cosine/correlation')
     parser.add_argument('--epochs', type=int, default=500, help='Number of epochs to train.')
@@ -143,11 +143,11 @@ def plot_pseudotime(args, adata, sample_name, dataset, cm = plt.get_cmap("gist_r
     plt.close('all')
 
 def plot_pipeline():
-    max_cells = 8000
+    max_cells = 10000
     params = get_params()
     args.dataset_dir = f'../../data'
     args.output_dir = f'../../output'
-    datasets = ["slideseq_v2", "seqfish_mouse", "stereo_seq"] #
+    datasets = ["stereo_seq"] #"slideseq_v2", "seqfish_mouse",
     for did, dataset in enumerate(datasets):
         print(f'===== Data {dataset} =====')
         data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
@@ -171,33 +171,36 @@ def plot_pipeline():
         plot_clustering(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)
         plot_pseudotime(args, adata_filtered, dataset, dataset, scatter_sz=1.5, scale=1)
 
-def basic_pipeline():
+def basic_pipeline(subset=False):
     params = get_params()
     args.dataset_dir = f'../../data'
     args.output_dir = f'../../output'
-    max_cells = 8000
-    datasets = ["slideseq_v2", "seqfish_mouse"]#,"stereo_seq"
+    max_cells = 10000
+    datasets = ["stereo_seq"]#"slideseq_v2", "seqfish_mouse",
     n_neighbors = [15, 15, 15]
     resolutions = [1.0, 0.8, 0.8]
     for did, dataset in enumerate(datasets):
         print(f'===== Data {dataset} =====')
         data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
-        indices_fp = os.path.join(data_root, "indices-for-sedr.npy")
-        if os.path.exists(indices_fp):
-            with open(indices_fp, 'rb') as f:
-                indices = np.load(f)
-                print("loaded indices successful!")
-            adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset, sedr=True)
+        if subset:
+            indices_fp = os.path.join(data_root, "indices-for-sedr.npy")
+            if os.path.exists(indices_fp):
+                with open(indices_fp, 'rb') as f:
+                    indices = np.load(f)
+                    print("loaded indices successful!")
+                adata_filtered = load_preprocessed_data(args, dataset, dataset, sedr=True)
+            else:
+                adata = load_datasets(args, dataset)
+                indices = np.random.choice(adata.shape[0], max_cells, replace=False)
+                with open(indices_fp, 'wb') as f:
+                    np.save(f, indices)
+                print("Saved indices")
+                adata = adata[indices, :]
+                adata_filtered = preprocessing_data_sedr(args, adata, pca_n_comps=params.cell_feat_dim)
+                save_preprocessed_data(args, dataset, dataset, adata_filtered, None, sedr=True)
         else:
             adata = load_datasets(args, dataset)
-            indices = np.random.choice(adata.shape[0], max_cells, replace=False)
-            with open(indices_fp, 'wb') as f:
-                np.save(f, indices)
-            print("Saved indices")
-            adata = adata[indices, :]
-            adata_filtered, spatial_graph = preprocessing_data_sedr(args, adata, pca_n_comps=params.cell_feat_dim)
-            save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph, sedr=True)
-
+            adata_filtered = preprocessing_data_sedr(args, adata, pca_n_comps=params.cell_feat_dim)
         graph_dict = graph_construction(adata_filtered.obsm['spatial'], adata_filtered.shape[0], params)
         print('==== Graph Construction Finished')
         params.save_path = f'{args.output_dir}/{dataset}/{dataset}/sedr'
@@ -242,5 +245,5 @@ def basic_pipeline():
         print("Saved %s succesful!" % pseudotime_fp)
 
 if __name__ == "__main__":
-    #basic_pipeline()
-    plot_pipeline()
+    basic_pipeline()
+    #plot_pipeline()

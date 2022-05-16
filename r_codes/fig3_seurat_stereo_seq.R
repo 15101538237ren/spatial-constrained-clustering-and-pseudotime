@@ -9,8 +9,8 @@ Convert(h5ad_fp, dest = "h5seurat", assay = "Spatial", overwrite = T)
 stereo.seq <- LoadH5Seurat(h5seurat_fp)
 stereo.seq <- SCTransform(stereo.seq, assay = "Spatial", verbose = F)
 stereo.seq <- RunPCA(stereo.seq, assay = "SCT", verbose = F)
-stereo.seq <- RunUMAP(stereo.seq, reduction = "pca", dims = 1:50)
-stereo.seq <- FindNeighbors(stereo.seq, reduction = "pca", dims = 1:50)
+stereo.seq <- RunUMAP(stereo.seq, dims = 1:50)
+stereo.seq <- FindNeighbors(stereo.seq, dims = 1:50)
 stereo.seq <- FindClusters(stereo.seq, resolution = .3, verbose = F)
 
 dir.output <- "../output/stereo_seq/stereo_seq/Seurat"
