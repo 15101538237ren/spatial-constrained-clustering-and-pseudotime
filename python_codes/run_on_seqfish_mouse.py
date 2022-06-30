@@ -4,3 +4,4 @@ from python_codes.visualize.seqfish_mouse import *
 
 if __name__ == "__main__":
     basic_pipeline(args)
+    #expr_analysis_pipeline(args)

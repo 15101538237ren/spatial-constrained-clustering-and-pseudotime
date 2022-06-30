@@ -93,8 +93,8 @@ results.table.p %>%
   ggplot( aes(x=Term, y=log10P,fill = log10P)) +
   geom_bar(stat="identity", alpha=.6, width=.4) +
   coord_flip() +
-  scale_fill_gradient(name="-log10(adj.pval)", low="blue", high="red") +
-  xlab("") + ylab("-log10(adj.pval)") + theme_bw()+ 
+  scale_fill_gradient(name="-log10(p-value)", low="blue", high="red") +
+  xlab("") + ylab("-log10(p-value)") + theme_bw()+ 
   theme(axis.line = element_line(colour = "black"),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),

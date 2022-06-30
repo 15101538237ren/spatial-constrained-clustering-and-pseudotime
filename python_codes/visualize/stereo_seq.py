@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import os, math, shutil
+import cmcrameri as cmc
 from scipy.spatial import distance_matrix
 from scipy.stats import pearsonr
 import matplotlib.patches as patches
-from python_codes.train.train import train
+# from python_codes.train.train import train
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
 from python_codes.util.util import load_stereo_seq_data, preprocessing_data, save_preprocessed_data, load_preprocessed_data, save_features
@@ -264,9 +265,9 @@ def plot_umap_comparison_with_coord_alpha(args, sample_name, dataset, n_neighbor
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
-def plot_pseudotime_comparison(args, sample_name, dataset, cm = plt.get_cmap("gist_rainbow"), n_neighbors=15):
+def plot_pseudotime_comparison(args, sample_name, dataset, cm = cmc.cm.roma, n_neighbors=15):#plt.get_cmap("gist_rainbow")
     methods = ["Seurat", "monocle", "slingshot", "DGI_SP"] #"DPT", "scanpy", "DGI"
-    files = ["seurat.PCs.tsv", None, None, "features.tsv"]
+    files = ["seurat.PCs.tsv", None, None, "features_origin.tsv"]
     nrow, ncol = 1, len(methods)
 
     data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
@@ -280,7 +281,7 @@ def plot_pseudotime_comparison(args, sample_name, dataset, cm = plt.get_cmap("gi
     coord = adata_filtered.obsm['spatial'].astype(float)
     x, y = coord[:, 0], coord[:, 1]
 
-    fig, axs = figure(nrow, ncol, rsz=5.0, csz=6.5, wspace=.2, hspace=.1, left=.05, right=.95)
+    fig, axs = figure(nrow, ncol, rsz=6, csz=6.2, wspace=.15, hspace=.1, left=.05, right=.95)
 
     for mid, method in enumerate(methods):
         print(f"Processing {sample_name} {method}")
@@ -290,7 +291,8 @@ def plot_pseudotime_comparison(args, sample_name, dataset, cm = plt.get_cmap("gi
         ax.axis('off')
         output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
         mkdir(output_dir)
-        pseudotime_fp = f"{output_dir}/pseudotime.tsv"
+        fn = "pseudotime.tsv" if method != "DGI_SP" else "pseudotime_origin.tsv"
+        pseudotime_fp = f"{output_dir}/{fn}"
         if not os.path.exists(pseudotime_fp):
             if method == "DPT":
                 adata = adata_filtered
@@ -334,7 +336,7 @@ def plot_pseudotime_comparison(args, sample_name, dataset, cm = plt.get_cmap("gi
         # method = "SpaceFlow" if mid == len(methods) - 1 else method
         # method = method.capitalize() if method != "stLearn" else method
         # ax.set_title(method.replace("_", " + "), fontsize=title_sz + 22, pad=10)
-    fig_fp = f"{output_dir}/psudotime_comparison.pdf"
+    fig_fp = f"{output_dir}/psudotime_comparison_origin.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
@@ -482,6 +484,126 @@ def plot_clustering_comparison_zoomed(args, sample_name, dataset, scatter_sz=15.
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
 
+def plot_clustering_comparison_diff_subsetting(args, sample_name, dataset, cm= plt.get_cmap("tab10"), cluster_method="leiden"):
+    method = "DGI_SP"
+    subsettings = ["origin", "subset_1e4", "subset_1e5", "subset_5e5"]
+    subsettings_names = ["No Subset", "Random Subset\n#Edges=1e4", "Random Subset\n#Edges=1e5", "Random Subset\n#Edges=5e5"]
+    nrow, ncol = 2, len(subsettings)
+
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
+    if os.path.exists(f"{data_root}/adata.h5ad"):
+        adata_filtered, _ = load_preprocessed_data(args, dataset, dataset)
+    else:
+        adata = load_stereo_seq_data(args)
+        adata_filtered, spatial_graph = preprocessing_data(args, adata)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+
+    coord = adata_filtered.obsm['spatial'].astype(float)
+    x, y = coord[:, 0], coord[:, 1]
+
+    fig, axs = figure(nrow, ncol, rsz=6, csz=6.2, wspace=.15, hspace=.1, left=.05, right=.95)
+
+    for mid, subsetting in enumerate(subsettings + subsettings):
+        print(f"Processing {sample_name} {subsetting}")
+        row = mid // ncol
+        col = mid % ncol
+        ax = axs[row][col] if nrow > 1 else axs[col]
+        ax.axis('off')
+        output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
+        mkdir(output_dir)
+        df = pd.read_csv(f"{output_dir}/{cluster_method}_{subsetting}.tsv", header=None)
+        pred_clusters = df.values.flatten().astype(int)
+        uniq_pred = np.unique(pred_clusters)
+        n_cluster = len(uniq_pred)
+        scatter_sz = 1. if row == 0 else 25.
+        for cid, cluster in enumerate(uniq_pred):
+            color = cm((cid * (n_cluster / (n_cluster - 1.0))) / n_cluster)
+            ind = pred_clusters == cluster
+            ax.scatter(-y[ind], x[ind], s=scatter_sz, color=color, label=cluster, marker=".")
+
+        if row == 0:
+            min_x, max_x = np.min(-y), np.max(-y)
+            min_y, max_y = np.min(x), np.max(x)
+            x_range = (max_x - min_x)
+            y_range = (max_y - min_y)
+            xr = min_x + x_range * .49
+            yr = min_y + y_range * .3
+
+            rect = patches.Rectangle((min_x + x_range * 0.25, min_y), (xr - min_x - x_range * 0.237), (yr - min_y),
+                                     linewidth=2, edgecolor='#495057', facecolor='none',linestyle="-")
+            ax.add_patch(rect)
+            ax.invert_yaxis()
+            box = ax.get_position()
+            height_ratio = 1.0
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height * height_ratio])
+            ncolumn = 2 if method == "MERINGUE" else 1
+            lgnd = ax.legend(loc='center left', fontsize=20, bbox_to_anchor=(1, 0.5), scatterpoints=1, handletextpad=0.05,
+                             borderaxespad=.05, markerscale=16., ncol=ncolumn, columnspacing=.3, borderpad=.4, handlelength=1.5)
+            for handle in lgnd.legendHandles:
+                handle._sizes = [100]
+            ax.set_title(subsettings_names[mid], fontsize=title_sz + 16, pad=10)
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width, box.height * 0.9])
+        else:
+            min_x, max_x = np.min(-y), np.max(-y)
+            min_y, max_y = np.min(x), np.max(x)
+            ax.set_xlim((min_x + (max_x - min_x) * .25, min_x + (max_x - min_x) * .49))
+            ax.set_ylim((min_y, min_y + (max_y - min_y) * .3))
+            ax.invert_yaxis()
+            ax.set_aspect('auto')
+            box = ax.get_position()
+            ax.set_position([box.x0 + (box.x1 - box.x0) * 0.12, box.y0, box.width * 0.6, box.height])
+    fig_fp = f"{output_dir}/cluster_comparison-subsettings.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
+def plot_pseudotime_comparison_diff_subsetting(args, sample_name, dataset, cm = cmc.cm.roma, cluster_method="leiden"):
+    method = "DGI_SP"
+    subsettings = ["origin", "subset_1e4", "subset_1e5", "subset_5e5"]
+    subsettings_names = ["No Subset", "Random Subset\n#Edges=1e4", "Random Subset\n#Edges=1e5", "Random Subset\n#Edges=5e5"]
+    nrow, ncol = 1, len(subsettings)
+
+    data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
+    if os.path.exists(f"{data_root}/adata.h5ad"):
+        adata_filtered, _ = load_preprocessed_data(args, dataset, dataset)
+    else:
+        adata = load_stereo_seq_data(args)
+        adata_filtered, spatial_graph = preprocessing_data(args, adata)
+        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+
+    coord = adata_filtered.obsm['spatial'].astype(float)
+    x, y = coord[:, 0], coord[:, 1]
+
+    fig, axs = figure(nrow, ncol, rsz=7.5, csz=7.5, wspace=.2, hspace=.1, left=.05, right=.95, bottom=0.1)
+
+    for mid, subsetting in enumerate(subsettings):
+        print(f"Processing {sample_name} {subsetting}")
+        row = mid // ncol
+        col = mid % ncol
+        ax = axs[row][col] if nrow > 1 else axs[col]
+        ax.axis('off')
+        output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
+        mkdir(output_dir)
+        pseudotime_fp = f"{output_dir}/pseudotime_{subsetting}.tsv"
+        df = pd.read_csv(pseudotime_fp, header=None)
+        pseudotimes = df.values.flatten().astype(float)
+        st = ax.scatter(-y, x, s=1, c=pseudotimes, cmap=cm)
+        ax.invert_yaxis()
+        axins = inset_locator.inset_axes(ax, width="3%", height="50%", loc='lower left',
+                                         bbox_to_anchor=(1.02, 0.1, 1, 1), bbox_transform=ax.transAxes, borderpad=0)
+        clb = fig.colorbar(st, cax=axins)
+        clb.set_ticks([np.nanmin(pseudotimes), np.nanmax(pseudotimes)])
+        clb.set_ticklabels(["0", "1"])
+        clb.ax.tick_params(labelsize=20)
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width, box.height * 0.9])
+        label = "pSM value"
+        clb.ax.set_ylabel(label, labelpad=10, rotation=270, fontsize=20, weight='bold')
+        ax.set_title(subsettings_names[mid], fontsize=title_sz + 22, pad=10)
+    fig_fp = f"{output_dir}/pseudotime_comparison-subsettings.pdf"
+    plt.savefig(fig_fp, dpi=300)
+    plt.close('all')
+
 
 def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, method="cluster", top_n_genes=3):
     original_spatial = args.spatial
@@ -612,29 +734,30 @@ def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="st
             save_features(args, embedding, dataset, sample_name)
 
         clustering(args, dataset, sample_name, clustering_method, n_neighbors=n_neighbors, resolution=get_resolution(args, sample_name, dataset))
-        #pseudotime(args, dataset, sample_name, n_neighbors=n_neighbors,
-        #           resolution=resolution)
+        pseudotime(args, dataset, sample_name, n_neighbors=n_neighbors,
+                   resolution=resolution)
 
 def basic_pipeline(args):
     dataset = "stereo_seq"
 
     print(f'===== Data: {dataset} =====')
     data_root = f'{args.dataset_dir}/{dataset}/{dataset}/preprocessed'
-    if os.path.exists(f"{data_root}/adata.h5ad"):
-        adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
-    else:
-        adata = load_stereo_seq_data(args)
-        adata_filtered, spatial_graph = preprocessing_data(args, adata)
-        save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
+    # if os.path.exists(f"{data_root}/adata.h5ad"):
+    #     adata_filtered, spatial_graph = load_preprocessed_data(args, dataset, dataset)
+    # else:
+    #     adata = load_stereo_seq_data(args)
+    #     adata_filtered, spatial_graph = preprocessing_data(args, adata)
+    #     save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
 
-    train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=20, isTrain=True)
+    #train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=20, isTrain=False)
     #plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1.5)
     # plot_pseudotime(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
     # plot_umap_comparison_with_coord_alpha(args, dataset, dataset)
     # plot_pseudotime_comparison(args, dataset, dataset)
     #plot_clustering_comparison(args, dataset, dataset)
-    plot_clustering_comparison_zoomed(args, dataset, dataset)
-
+    # plot_clustering_comparison_zoomed(args, dataset, dataset)
+    # plot_clustering_comparison_diff_subsetting(args, dataset, dataset)
+    plot_pseudotime_comparison_diff_subsetting(args, dataset, dataset)
 def corr_expr_analysis_pipeline(args):
     dataset = "stereo_seq"
     print(f'===== Data: {dataset} =====')

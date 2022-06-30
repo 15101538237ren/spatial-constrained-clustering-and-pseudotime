@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import math, shutil
+import cmcrameri as cmc
 from colour import Color
 from scipy.spatial import distance_matrix
 from scipy.stats import pearsonr
@@ -198,7 +199,7 @@ def calc_pseudotime_corr_genes(args, sample_name, dataset="DLPFC", n_top=28):
     args.spatial = original_spatial
     return df.values[:n_top, 0].astype(str)
 
-def plot_pseudotime_comparison(args, sample_name, dataset="DLPFC", cm = plt.get_cmap("gist_rainbow"), scale = 0.045, n_neighbors=50, root_cell_type = None, cell_types=None):
+def plot_pseudotime_comparison(args, sample_name, dataset="DLPFC", cm = cmc.cm.roma, scale = 0.045, n_neighbors=50, root_cell_type = None, cell_types=None):##plt.get_cmap("gist_rainbow")
     methods = ["Seurat", "monocle", "stLearn", "DGI_SP"]#, "slingshot", "DGI"
     files = ["seurat.PCs.tsv", None, "PCs.tsv", "features.tsv"]#, None, "features.tsv"
     nrow, ncol = 1, len(methods)
@@ -395,7 +396,7 @@ def plot_umap_comparison_with_coord_gradient(args, sample_name, dataset="DLPFC",
     fig, axs = figure(nrow, ncol, rsz=3, csz=3.7, wspace=.4, hspace=.1, bottom=.1)
     for ax in axs:
         ax.axis('off')
-    cm = plt.get_cmap("gist_ncar")
+    cm = cmc.cm.bam#plt.get_cmap("gist_ncar")
     ax = axs[0]
     st = ax.scatter(x, y, s=2, c=normed_c, cmap=cm)
     #ax.set_title("Cell Locations", fontsize=title_sz + 4, pad=10)

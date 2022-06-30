@@ -12,6 +12,7 @@ from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
 from python_codes.util.exchangeable_loom import write_exchangeable_loom
 warnings.filterwarnings("ignore")
+import cmcrameri as cmc
 from python_codes.util.util import *
 from matplotlib.colors import to_hex
 from matplotlib import rcParams
@@ -137,7 +138,7 @@ def plot_pseudotime(args, adata, sample_name, dataset="Visium", cm = plt.get_cma
     plt.close('all')
     args.spatial = original_spatial
 
-def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", dataset="Visium", cluster_cm = plt.get_cmap("Paired"),pseudotime_cm = plt.get_cmap("gist_rainbow"), scatter_sz=1., nrow= 1, title_padding=10):
+def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", dataset="Visium", cluster_cm = plt.get_cmap("Paired"),pseudotime_cm = cmc.cm.roma, scatter_sz=1., nrow= 1, title_padding=10):
     original_spatial = args.spatial
     fig, axs, x, y, xlim, ylim = plot_annotation(args, adata, sample_name, nrow=nrow, ncol=3, rsz=2.5, csz=3, wspace=0.3, hspace=.05, left=.1, right=.95)
 

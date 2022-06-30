@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import os, math, shutil
 import warnings
-# from python_codes.train.train import train
+import cmcrameri as cmc
+#from python_codes.train.train import train
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
 from python_codes.util.util import load_seqfish_mouse_data, preprocessing_data, save_preprocessed_data, load_preprocessed_data, save_features
@@ -94,8 +95,8 @@ def plot_annotation(args, adata, nrow = 1, scale = 0.045, ncol=4, rsz=2.5, csz=2
 
 def plot_clustering(args, adata, sample_name, method="leiden", dataset="seqfish_mouse", cm = plt.get_cmap("tab20"), scale = .62, scatter_sz=1., nrow= 1):
     original_spatial = args.spatial
-    fig, axs, x, y, xlim, ylim = plot_annotation(args, adata, scale=scale, nrow=nrow, ncol=3, rsz=5, csz=5.5, wspace=.3, hspace=.4)
-    spatials = [False, True]
+    fig, axs, x, y, xlim, ylim = plot_annotation(args, adata, scale=scale, nrow=nrow, ncol=2, rsz=5, csz=5.5, wspace=.3, hspace=.4)
+    spatials = [True]#False,
     for sid, spatial in enumerate(spatials):
         ax = axs[sid + 1]
         args.spatial = spatial
@@ -127,8 +128,8 @@ def plot_clustering(args, adata, sample_name, method="leiden", dataset="seqfish_
 
 def plot_pseudotime(args, adata, sample_name, dataset="seqfish_mouse", cm = plt.get_cmap("gist_rainbow"), scale = 0.62, scatter_sz=1.3, nrow = 1):
     original_spatial = args.spatial
-    fig, axs, x, y, _, _ = plot_annotation(args, adata, scale=scale, nrow=nrow, ncol=3, rsz=5, csz=5.5, wspace=.3, hspace=.4)
-    spatials = [False, True]
+    fig, axs, x, y, _, _ = plot_annotation(args, adata, scale=scale, nrow=nrow, ncol=2, rsz=5, csz=5.5, wspace=.3, hspace=.4)
+    spatials = [True]#False,
     for sid, spatial in enumerate(spatials):
         ax = axs[sid + 1]
         args.spatial = spatial
@@ -148,13 +149,13 @@ def plot_pseudotime(args, adata, sample_name, dataset="seqfish_mouse", cm = plt.
     plt.close('all')
     args.spatial = original_spatial
 
-def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm = plt.get_cmap("RdPu"), n_cols = 4, max_expr_threshold=.0):
+def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm = plt.get_cmap("RdPu"), n_cols = 3, max_expr_threshold=.0):
     args.spatial = True
     output_dir = f'{args.output_dir}/{get_target_fp(args, dataset, sample_name)}'
     mkdir(output_dir)
     n_genes = len(genes)
     n_rows = int(math.ceil(n_genes/n_cols))
-    fig, axs = figure(n_rows, n_cols, rsz=5.5, csz=5.2, wspace=.1, hspace=.3, left=.05, right=.95)
+    fig, axs = figure(n_rows, n_cols, rsz=10.5, csz=9.6, wspace=.1, hspace=.3, left=.05, right=.95)
     exprs = np.array(adata.X.todense()).astype(float)
     all_genes = np.array(adata.var_names)
 
@@ -173,6 +174,13 @@ def plot_expr_in_ST(args, adata, genes, sample_name, dataset, scatter_sz= 1., cm
         #     clb = fig.colorbar(st, cax=cax)
         #     clb.ax.set_ylabel("Expr.", labelpad=10, rotation=270, fontsize=10, weight='bold')
         ax.set_title(gene, fontsize=28, pad=20)
+    expr1 = exprs[:, all_genes == genes[0]]
+    expr1 = (expr1 - expr1.mean()) / expr1.std()
+    expr2 = exprs[:, all_genes == genes[1]]
+    expr2 = (expr2 - expr2.mean()) / expr2.std()
+    ax = set_ax_for_expr_plotting(axs[2])
+    ax.scatter(x, y, s=scatter_sz, c=expr1*expr2, cmap=cm, vmin=0, vmax=6)
+    ax.set_title("Coexpression", fontsize=28, pad=20)
     fig_fp = f"{output_dir}/ST_expression.pdf"
     plt.savefig(fig_fp, dpi=300)
     plt.close('all')
@@ -284,7 +292,7 @@ def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, met
         for group in groups for key in ['names', 'pvals']})
     df.to_csv(cluster_marker_genes_fp, sep="\t", index=False)
 
-def plot_pseudotime_comparison(args, adata, sample_name, dataset="seqfish_mouse", cm = plt.get_cmap("gist_rainbow"), scale = 0.045, n_neighbors=50, root_cell_type = None, cell_types=None):
+def plot_pseudotime_comparison(args, adata, sample_name, dataset="seqfish_mouse", cm = cmc.cm.roma, scale = 0.045, n_neighbors=50, root_cell_type = None, cell_types=None):
     methods = ["Seurat", "monocle", "slingshot", "DGI_SP"]#, "stLearn", "DGI"
     files = ["seurat.PCs.tsv", None, None, "features.tsv"]#, "PCs.tsv", "features.tsv"
     nrow, ncol = 1, len(methods)
@@ -375,14 +383,14 @@ def export_data_pipeline(args):
     print(f'===== Exported {dataset} =====')
 
 def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="seqfish_mouse", clustering_method="leiden", resolution=.3, n_neighbors=15, isTrain=True):
-    for spatial in [False, True]:
+    for spatial in [True]:#False,
         args.spatial = spatial
         if isTrain:
             embedding = train(args, adata_filtered, spatial_graph)
             save_features(args, embedding, dataset, sample_name)
-        # clustering(args, dataset, sample_name, clustering_method, n_neighbors=n_neighbors, resolution=resolution)
-        pseudotime(args, dataset, sample_name, root_cell_type=None, cell_types=None, n_neighbors=n_neighbors,
-                   resolution=resolution)
+        clustering(args, dataset, sample_name, clustering_method, n_neighbors=n_neighbors, resolution=resolution)
+        pseudotime(args, dataset, sample_name, n_neighbors=n_neighbors,
+                    resolution=resolution)
 
 def basic_pipeline(args):
     dataset = "seqfish_mouse"
@@ -396,18 +404,18 @@ def basic_pipeline(args):
         adata_filtered, spatial_graph = preprocessing_data(args, adata)
         save_preprocessed_data(args, dataset, dataset, adata_filtered, spatial_graph)
 
-    # train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=30, isTrain=False)
+    #train_pipeline(args, adata_filtered, spatial_graph, dataset, n_neighbors=30, isTrain=True)
     #plot_clustering(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
-    # plot_pseudotime(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
+    #plot_pseudotime(args, adata_filtered, dataset, scatter_sz=1.5, scale=1)
     # plot_umap_comparison_with_coord_alpha(args, dataset, dataset)
     plot_pseudotime_comparison(args, adata_filtered, dataset, dataset)
 
 def expr_analysis_pipeline(args):
     dataset = "seqfish_mouse"
-    genes = ["Tbx1", "Sox2", "Foxa1", "Lhx2", "Otx2", "Hand1", "Ttn", "Cldn4"]
+    genes = ["Fgf3", "Fgfr3"]#["Tbx1", "Sox2", "Foxa1", "Lhx2", "Otx2", "Hand1", "Ttn", "Cldn4"]
     print(f'===== Data: {dataset} =====')
     adata = load_seqfish_mouse_data()
-    plot_expr_in_ST(args, adata, genes, dataset, dataset, scatter_sz=2.0)
+    plot_expr_in_ST(args, adata, genes, dataset, dataset, scatter_sz=1.0)
 
 def marker_gene_pipeline(args):
     dataset = "seqfish_mouse"

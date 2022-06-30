@@ -5,7 +5,7 @@ from python_codes.visualize.chicken import *
 if __name__ == "__main__":
     # gene_ontology_pipeline(args)
     #basic_pipeline(args)
-    annotation_pipeline(args)
+    # annotation_pipeline(args)
     # lineage_pipeline(args, all_lineage=False)
-    # expr_analysis_pipeline(args)
+    expr_analysis_pipeline(args)
     #cell_cell_communication_prep_pipeline(args)

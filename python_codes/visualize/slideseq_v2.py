@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os, math, shutil
+import cmcrameri as cmc
 #from python_codes.train.train import train
 from python_codes.train.clustering import clustering
 from python_codes.train.pseudotime import pseudotime
@@ -281,9 +282,9 @@ def plot_rank_marker_genes_group(args, dataset, sample_name, adata_filtered, met
         for group in groups for key in ['names', 'pvals']})
     df.to_csv(cluster_marker_genes_fp, sep="\t", index=False)
 
-def plot_pseudotime_comparison(args, adata, sample_name, dataset="slideseq_v2", cm = plt.get_cmap("gist_rainbow"), scale = 0.045, n_neighbors=50, root_cell_type = None, cell_types=None):
+def plot_pseudotime_comparison(args, adata, sample_name, dataset="slideseq_v2", cm =cmc.cm.roma, scale = 0.045, n_neighbors=50, root_cell_type = None, cell_types=None):
     methods = ["Seurat", "monocle", "slingshot", "DGI_SP"]#, "stLearn", "DGI"
-    files = ["seurat.PCs.tsv", None, None, "features.tsv"]#, "PCs.tsv", "features.tsv"
+    files = ["seurat.PCs.tsv", None, None, "features_origin.tsv"]#, "PCs.tsv", "features.tsv"
     nrow, ncol = 1, len(methods)
 
     coord = adata.obsm['spatial'].astype(float) * scale
@@ -299,7 +300,8 @@ def plot_pseudotime_comparison(args, adata, sample_name, dataset="slideseq_v2", 
         col = mid % ncol
         ax = axs[col]
         output_dir = f'{args.output_dir}/{dataset}/{sample_name}/{method}'
-        pseudotime_fp = f"{output_dir}/pseudotime.tsv"
+        fn = "pseudotime.tsv" if method != "DGI_SP" else "pseudotime_origin.tsv"
+        pseudotime_fp = f"{output_dir}/{fn}"
         if not os.path.exists(pseudotime_fp):
             file_name = files[mid]
             feature_fp = f'{output_dir}/{file_name}'
@@ -376,8 +378,7 @@ def train_pipeline(args, adata_filtered, spatial_graph, sample_name, dataset="sl
             embedding = train(args, adata_filtered, spatial_graph)
             save_features(args, embedding, dataset, sample_name)
         clustering(args, dataset, sample_name, clustering_method, n_neighbors=n_neighbors, resolution=resolution)
-        pseudotime(args, dataset, sample_name, root_cell_type=None, cell_types=None, n_neighbors=n_neighbors,
-                   resolution=resolution)
+        pseudotime(args, dataset, sample_name, n_neighbors=n_neighbors, resolution=resolution)
 
 def basic_pipeline(args):
     dataset = "slideseq_v2"
@@ -400,7 +401,7 @@ def basic_pipeline(args):
         # plot_rank_marker_genes_group(args, sample_name, adata_filtered, top_n_genes=5)
         # get_correlation_matrix_btw_clusters(args, sample_name, adata_filtered)
         #plot_umap_comparison_with_coord_alpha(args, dataset, dataset)
-        # plot_pseudotime_comparison(args, adata_filtered, dataset, dataset)
+        plot_pseudotime_comparison(args, adata_filtered, dataset, dataset)
 
 def expr_analysis_pipeline(args):
     dataset = "slideseq_v2"

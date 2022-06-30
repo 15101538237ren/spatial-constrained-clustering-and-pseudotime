@@ -8,6 +8,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import cmcrameri as cmc
 from scipy.spatial.distance import cdist
 from scipy.stats import wilcoxon, pearsonr
 from scipy.spatial import distance_matrix
@@ -363,7 +364,7 @@ def plot_pseudotime(args, adata, sample_name, dataset="breast_cancer", cm = plt.
 def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", dataset="breast_cancer", scale = 1., scatter_sz=1.3, nrow = 1, annotation=False, alpha=.5):
     original_spatial = args.spatial
     args.spatial = True
-    fig, axs, x, y, img, xlim, ylim = plot_hne_and_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=5, rsz=2.6,
+    fig, axs, x, y, img, xlim, ylim = plot_hne_and_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=6, rsz=2.6,
                                                               csz=3.9, wspace=1, hspace=.4, annotation=annotation)
     ax = axs[1]
     ax.imshow(img, alpha=alpha)
@@ -413,7 +414,7 @@ def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", da
     ax.imshow(img, alpha=alpha)
 
     pseudotimes = pd.read_csv(f"{output_dir}/pseudotime.tsv", header=None).values.flatten().astype(float)
-    pseudo_time_cm = plt.get_cmap("gist_rainbow")
+    pseudo_time_cm = cmc.cm.roma#plt.get_cmap("gist_rainbow")
     st = ax.scatter(x, y, s=scatter_sz, c=pseudotimes, cmap=pseudo_time_cm)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%")
@@ -428,7 +429,23 @@ def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", da
     ax.imshow(img, alpha=alpha)
     method = "stLearn" #"monocole"
     pseudotimes = pd.read_csv(f"{args.output_dir}/{dataset}/{sample_name}/{method}/pseudotime.tsv", header=None).values.flatten().astype(float)
-    pseudo_time_cm = plt.get_cmap("gist_rainbow")
+    pseudo_time_cm = cmc.cm.roma
+    st = ax.scatter(x, y, s=scatter_sz, c=pseudotimes, cmap=pseudo_time_cm)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%")
+    clb = fig.colorbar(st, cax=cax)
+    clb.ax.set_ylabel("pseudotime", labelpad=10, rotation=270, fontsize=8, weight='bold')
+    ax.set_title(f"{method}\n(pseudotime)", fontsize=title_sz)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.invert_yaxis()
+
+    ax = axs[5]
+    ax.imshow(img, alpha=alpha)
+    method = "monocole"
+    pseudotimes = pd.read_csv(f"{args.output_dir}/{dataset}/{sample_name}/{method}/pseudotime.tsv",
+                              header=None).values.flatten().astype(float)
+    pseudo_time_cm = cmc.cm.roma
     st = ax.scatter(x, y, s=scatter_sz, c=pseudotimes, cmap=pseudo_time_cm)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%")
@@ -445,7 +462,7 @@ def plot_clustering_and_pseudotime(args, adata, sample_name, method="leiden", da
     args.spatial = original_spatial
 
 
-def plot_clustering_and_pseudotime_SI(args, adata, sample_name, method="leiden", dataset="breast_cancer", scale = 1., scatter_sz=1.3, nrow = 1, annotation=False, cluster_cm = plt.get_cmap("tab10"),pseudotime_cm = plt.get_cmap("gist_rainbow"), alpha=.5):
+def plot_clustering_and_pseudotime_SI(args, adata, sample_name, method="leiden", dataset="breast_cancer", scale = 1., scatter_sz=1.3, nrow = 1, annotation=False, cluster_cm = plt.get_cmap("tab10"),pseudotime_cm=cmc.cm.roma, alpha=.5):
     original_spatial = args.spatial
     args.spatial = True
     fig, axs, x, y, img, xlim, ylim = plot_hne_and_annotation(args, adata, sample_name, scale=scale, nrow=nrow, ncol=4, rsz=2.6,
@@ -935,7 +952,7 @@ def umap_pipeline(args):
 
 
 def basic_pipeline(args):
-    letters = ["A", "B", "C", "D", "E", "F", "H"]#["H"]#["G"]#, "G"
+    letters = ["G"]#["H"]#["G"]#, "G""A", "B", "C", "D", "E", "F", "H"
     n_samples = [1 for letter in letters] #[6, 6, 6, 6, 3, 3, 3, 3]#
     sample_list = [f"{letter}{sid}" for lid, letter in enumerate(letters) for sid in range(1, n_samples[lid] + 1)]
 
