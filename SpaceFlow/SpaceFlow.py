@@ -5,7 +5,7 @@ import torch
 import random
 import gudhi
 import anndata
-import cmrameri
+import cmcrameri
 import numpy as np
 import scanpy as sc
 import networkx as nx
